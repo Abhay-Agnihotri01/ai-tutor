@@ -85,7 +85,7 @@ export const getCourse = async (req, res) => {
       .from('chapters')
       .select(`
         *,
-        videos(*),
+        videos(*, duration),
         resources(*)
       `)
       .eq('courseId', id)
@@ -123,7 +123,7 @@ export const createCourse = async (req, res) => {
   try {
 
     
-    const { title, shortDescription, description, category, level, price, language } = req.body;
+    const { title, shortDescription, description, category, level, price, language, discountPrice } = req.body;
     const instructorId = req.user.id;
     
     // Validate required fields
@@ -143,6 +143,7 @@ export const createCourse = async (req, res) => {
       category,
       level: level || 'beginner',
       price: parseFloat(price) || 0,
+      discountPrice: discountPrice ? parseFloat(discountPrice) : null,
       language: language || 'English',
       thumbnail,
       instructorId,
@@ -205,8 +206,15 @@ export const getInstructorCourses = async (req, res) => {
           currentRating = Math.round(currentRating * 10) / 10;
         }
 
-        // Calculate revenue: enrollment count * course price
-        const revenue = (enrollmentCount || 0) * (course.price || 0);
+        // Calculate revenue from actual prices paid
+        const { data: courseEnrollments } = await supabase
+          .from('enrollments')
+          .select('pricePaid')
+          .eq('courseId', course.id);
+        
+        const revenue = courseEnrollments?.reduce((sum, enrollment) => 
+          sum + (enrollment.pricePaid || 0), 0
+        ) || 0;
 
         return {
           ...course,
@@ -251,21 +259,18 @@ export const getInstructorStats = async (req, res) => {
     let totalRatedCourses = 0;
 
     for (const course of courses || []) {
-      // Get enrollment count for this course
-      const { count: enrollmentCount } = await supabase
+      // Get enrollments with actual prices paid
+      const { data: courseEnrollments } = await supabase
         .from('enrollments')
-        .select('*', { count: 'exact', head: true })
+        .select('pricePaid')
         .eq('courseId', course.id);
 
-      // Get course details for price
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('price')
-        .eq('id', course.id)
-        .single();
-
-      // Add to total revenue
-      totalRevenue += (enrollmentCount || 0) * (courseData?.price || 0);
+      // Calculate revenue from actual prices paid
+      const courseRevenue = courseEnrollments?.reduce((sum, enrollment) => 
+        sum + (enrollment.pricePaid || 0), 0
+      ) || 0;
+      
+      totalRevenue += courseRevenue;
 
       // Get ratings for average calculation
       const { data: ratingData } = await supabase
@@ -301,7 +306,7 @@ export const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
     const instructorId = req.user.id;
-    const { title, shortDescription, description, category, level, price, language } = req.body;
+    const { title, shortDescription, description, category, level, price, language, discountPrice } = req.body;
 
     const { data: course, error: findError } = await supabase
       .from('courses')
@@ -336,6 +341,7 @@ export const updateCourse = async (req, res) => {
       category,
       level,
       price: parseFloat(price) || course.price,
+      discountPrice: discountPrice ? parseFloat(discountPrice) : null,
       language,
       thumbnail: thumbnailUrl,
       updatedAt: getCurrentTimestamp()

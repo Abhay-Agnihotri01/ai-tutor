@@ -28,8 +28,8 @@ router.put('/chapters/:id', updateChapter);
 router.delete('/chapters/:id', deleteChapter);
 router.post('/videos', uploadVideo.single('video'), createVideo);
 router.put('/videos/reorder', reorderVideos);
-// Test with POST method to see if PUT is the issue
-router.put('/videos/:id/replace', uploadVideo.single('video'), replaceVideo);
+// Replace route must come BEFORE the generic :id route
+router.post('/videos/:id/replace', uploadVideo.single('video'), replaceVideo);
 router.put('/videos/:id', updateVideo);
 router.delete('/videos/:id', deleteVideo);
 

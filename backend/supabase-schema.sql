@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS courses (
   description TEXT,
   thumbnail TEXT,
   price DECIMAL(10,2) DEFAULT 0,
+  "discountPrice" DECIMAL(10,2),
   category VARCHAR(100),
   level VARCHAR(50),
   language VARCHAR(50),

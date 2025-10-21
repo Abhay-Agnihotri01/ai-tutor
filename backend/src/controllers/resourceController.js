@@ -3,15 +3,33 @@ import cloudinary from '../config/cloudinary.js';
 
 export const createResource = async (req, res) => {
   try {
+    console.log('Creating resource with data:', {
+      body: req.body,
+      file: req.file ? {
+        originalname: req.file.originalname,
+        size: req.file.size,
+        path: req.file.path
+      } : null,
+      user: req.user?.id
+    });
+
     const { chapterId, title } = req.body;
     const instructorId = req.user.id;
+
+    if (!chapterId) {
+      return res.status(400).json({ message: 'Chapter ID is required' });
+    }
+
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
 
     if (!req.file) {
       return res.status(400).json({ message: 'No file provided' });
     }
 
     // Verify chapter belongs to instructor
-    const { data: chapter } = await supabase
+    const { data: chapter, error: chapterError } = await supabase
       .from('chapters')
       .select(`
         *,
@@ -22,33 +40,51 @@ export const createResource = async (req, res) => {
       .eq('id', chapterId)
       .single();
 
+    if (chapterError) {
+      console.error('Chapter query error:', chapterError);
+      return res.status(500).json({ message: 'Error verifying chapter', error: chapterError.message });
+    }
+
     if (!chapter || chapter.courses?.instructorId !== instructorId) {
       return res.status(404).json({ message: 'Chapter not found or unauthorized' });
     }
 
     // Get resource count for ordering
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('resources')
       .select('*', { count: 'exact', head: true })
       .eq('chapterId', chapterId);
 
+    if (countError) {
+      console.error('Count query error:', countError);
+    }
+
     const order = (count || 0) + 1;
 
     // Create resource
+    const resourceData = {
+      chapterId,
+      title,
+      fileUrl: req.file.path,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      order
+    };
+
+    console.log('Inserting resource with data:', resourceData);
+
     const { data: resource, error } = await supabase
       .from('resources')
-      .insert({
-        chapterId,
-        title,
-        fileUrl: req.file.path,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-        order
-      })
+      .insert(resourceData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Resource insert error:', error);
+      throw error;
+    }
+
+    console.log('Resource created successfully:', resource);
 
     res.status(201).json({
       success: true,

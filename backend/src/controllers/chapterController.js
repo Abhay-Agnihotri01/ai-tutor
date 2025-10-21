@@ -184,7 +184,8 @@ export const replaceVideo = async (req, res) => {
     const { title, duration } = req.body;
     const instructorId = req.user.id;
     const newVideoUrl = req.file ? req.file.path : null;
-    const newThumbnailUrl = req.file ? req.file.path.replace('/video/upload/', '/video/upload/so_10,w_320,h_240,c_fill/') : null;
+    // Generate thumbnail from video frame at 10 seconds as JPG image
+    const newThumbnailUrl = req.file ? req.file.path.replace('/video/upload/', '/video/upload/so_10,w_400,h_225,c_fill,q_auto,f_jpg/').replace('.mp4', '.jpg') : null;
 
     if (!req.file) {
       return res.status(400).json({ message: 'No video file provided' });
@@ -249,7 +250,8 @@ export const createVideo = async (req, res) => {
     const { chapterId, title, duration, description } = req.body;
     const instructorId = req.user.id;
     const videoUrl = req.file ? req.file.path : null;
-    const thumbnailUrl = req.file ? req.file.path.replace('/video/upload/', '/video/upload/so_10,w_320,h_240,c_fill/') : null;
+    // Generate thumbnail from video frame at 10 seconds as JPG image
+    const thumbnailUrl = req.file ? req.file.path.replace('/video/upload/', '/video/upload/so_10,w_400,h_225,c_fill,q_auto,f_jpg/').replace('.mp4', '.jpg') : null;
     
     if (!videoUrl) {
       return res.status(400).json({ message: 'No video file provided' });

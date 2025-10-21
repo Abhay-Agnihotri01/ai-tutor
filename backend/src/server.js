@@ -14,8 +14,12 @@ import instructorRoutes from './routes/instructorRoutes.js';
 import chapterRoutes from './routes/chapterRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
+import downloadRoutes from './routes/downloadRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
+import qaRoutes from './routes/qaRoutes.js';
+import certificateRoutes from './routes/certificateRoutes.js';
 
 import passport from './config/passport.js';
 
@@ -29,6 +33,8 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
     directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:", "http:", "https://res.cloudinary.com"],
       frameAncestors: ["'self'", "http://localhost:5173", "http://localhost:3000"]
     }
   }
@@ -144,6 +150,113 @@ app.get('/api/debug/test-question-model', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Test creating a question manually
+app.post('/api/debug/create-test-question/:quizId', async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    
+    // First check if quiz exists
+    const { data: quiz, error: quizError } = await supabase
+      .from('quizzes')
+      .select('id, title')
+      .eq('id', quizId)
+      .single();
+    
+    if (quizError || !quiz) {
+      return res.status(404).json({ error: 'Quiz not found', quizError });
+    }
+    
+    // Create a test question
+    const { data: question, error: questionError } = await supabase
+      .from('quiz_questions')
+      .insert({
+        "quizId": quizId,
+        "questionText": 'Test question: What is 2+2?',
+        "questionType": 'single_correct',
+        points: 1
+      })
+      .select()
+      .single();
+    
+    if (questionError) {
+      return res.status(500).json({ error: 'Failed to create question', questionError });
+    }
+    
+    // Create test options
+    const optionsData = [
+      { "questionId": question.id, "optionText": '3', "isCorrect": false, "orderIndex": 0 },
+      { "questionId": question.id, "optionText": '4', "isCorrect": true, "orderIndex": 1 },
+      { "questionId": question.id, "optionText": '5', "isCorrect": false, "orderIndex": 2 }
+    ];
+    
+    const { data: options, error: optionsError } = await supabase
+      .from('quiz_options')
+      .insert(optionsData)
+      .select();
+    
+    if (optionsError) {
+      return res.status(500).json({ error: 'Failed to create options', optionsError });
+    }
+    
+    // Update quiz totalMarks
+    await supabase
+      .from('quizzes')
+      .update({ "totalMarks": 1 })
+      .eq('id', quizId);
+    
+    res.json({ 
+      success: true, 
+      quiz,
+      question, 
+      options,
+      message: 'Test question created successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test quiz tables
+app.get('/api/debug/test-quiz-tables', async (req, res) => {
+  try {
+    // Test if tables exist
+    const { data: quizzes, error: quizzesError } = await supabase
+      .from('quizzes')
+      .select('id, title')
+      .limit(1);
+    
+    const { data: questions, error: questionsError } = await supabase
+      .from('quiz_questions')
+      .select('id, "questionText"')
+      .limit(1);
+    
+    const { data: options, error: optionsError } = await supabase
+      .from('quiz_options')
+      .select('id, "optionText"')
+      .limit(1);
+    
+    res.json({
+      tablesExist: {
+        quizzes: !quizzesError,
+        quiz_questions: !questionsError,
+        quiz_options: !optionsError
+      },
+      errors: {
+        quizzes: quizzesError?.message,
+        quiz_questions: questionsError?.message,
+        quiz_options: optionsError?.message
+      },
+      sampleData: {
+        quizzes: quizzes || [],
+        questions: questions || [],
+        options: options || []
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Debug quiz creation
@@ -321,6 +434,150 @@ app.get('/api/debug/quiz-marks/:quizId', async (req, res) => {
   }
 });
 
+// Debug chapters for specific course
+app.get('/api/debug/chapters/:courseId', async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { data, error } = await supabase
+      .from('chapters')
+      .select(`
+        *,
+        videos (*),
+        resources (*)
+      `)
+      .eq('courseId', courseId)
+      .order('order', { ascending: true });
+    
+    res.json({ 
+      success: true,
+      message: 'Chapters data for course',
+      courseId,
+      chapters: data,
+      error: error
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      message: 'Failed to get chapters'
+    });
+  }
+});
+
+// Debug videos table
+app.get('/api/debug/videos-table', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('videos')
+      .select('id, title, videoUrl, thumbnailUrl, duration')
+      .limit(5);
+    
+    res.json({ 
+      success: true,
+      message: 'Videos table accessible',
+      sampleData: data,
+      error: error
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      message: 'Failed to access videos table'
+    });
+  }
+});
+
+// Debug resources table
+app.get('/api/debug/resources-table', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('resources')
+      .select('*')
+      .limit(10);
+    
+    res.json({ 
+      success: true,
+      message: 'Resources table accessible',
+      sampleData: data,
+      error: error
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      message: 'Failed to access resources table'
+    });
+  }
+});
+
+// Debug endpoint to fix resource URLs missing extensions
+app.post('/api/debug/fix-resource-urls', async (req, res) => {
+  try {
+    // Get all resources with Cloudinary URLs
+    const { data: resources, error } = await supabase
+      .from('resources')
+      .select('*')
+      .like('fileUrl', '%cloudinary.com%');
+    
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    
+    const fixedResources = [];
+    
+    for (const resource of resources) {
+      if (resource.fileUrl && resource.fileName) {
+        const urlParts = resource.fileUrl.split('/');
+        const filename = urlParts[urlParts.length - 1];
+        
+        // Check if URL is missing extension but fileName has one
+        if (!filename.includes('.') && resource.fileName.includes('.')) {
+          const extension = resource.fileName.split('.').pop();
+          const newUrl = `${resource.fileUrl}.${extension}`;
+          
+          // Update the resource
+          const { error: updateError } = await supabase
+            .from('resources')
+            .update({ fileUrl: newUrl })
+            .eq('id', resource.id);
+          
+          if (!updateError) {
+            fixedResources.push({
+              id: resource.id,
+              title: resource.title,
+              oldUrl: resource.fileUrl,
+              newUrl: newUrl
+            });
+          }
+        }
+      }
+    }
+    
+    res.json({ 
+      message: `Fixed ${fixedResources.length} resource URLs`,
+      fixedResources 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test resource upload endpoint
+app.post('/api/debug/test-resource-upload', (req, res) => {
+  console.log('=== TEST RESOURCE UPLOAD ===');
+  console.log('Body:', req.body);
+  console.log('Files:', req.files);
+  console.log('File:', req.file);
+  console.log('Headers:', req.headers);
+  res.json({ 
+    success: true, 
+    body: req.body,
+    hasFile: !!req.file,
+    file: req.file ? {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    } : null
+  });
+});
+
 // Debug assignment issue (public endpoint)
 app.get('/api/debug/assignment/:quizId', async (req, res) => {
   try {
@@ -414,8 +671,12 @@ app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/instructor', instructorRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/resources', resourceRoutes);
+app.use('/api/download', downloadRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/qa', qaRoutes);
+app.use('/api/certificates', certificateRoutes);
 app.use('/api', chapterRoutes);
 
 // Debug enrollments

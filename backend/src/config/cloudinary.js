@@ -27,7 +27,9 @@ export const resourceStorage = new CloudinaryStorage({
   params: {
     folder: 'lms-resources',
     resource_type: 'raw',
-    allowed_formats: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt', 'zip']
+    use_filename: true,
+    unique_filename: true,
+    access_mode: 'public'
   }
 });
 

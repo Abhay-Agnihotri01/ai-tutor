@@ -40,13 +40,18 @@ export const enrollInCourse = async (req, res) => {
       return res.status(404).json({ message: 'Course not found or not published' });
     }
 
-    // Create enrollment
+    // Calculate actual price paid (use discount price if available)
+    const actualPrice = course.discountPrice || course.price || 0;
+    
+    // Create enrollment with actual price paid
     const { data: enrollment, error } = await supabase
       .from('enrollments')
       .insert({
         userId,
         courseId,
-        progress: 0
+        progress: 0,
+        pricePaid: actualPrice,
+        enrolledAt: new Date().toISOString()
       })
       .select()
       .single();
@@ -101,6 +106,83 @@ export const getUserEnrollments = async (req, res) => {
     });
   } catch (error) {
     console.error('Get enrollments error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+export const markVideoComplete = async (req, res) => {
+  try {
+    const { videoId, courseId } = req.body;
+    const userId = req.user.id;
+
+    // Check if already completed
+    const { data: existing } = await supabase
+      .from('video_progress')
+      .select('*')
+      .eq('userId', userId)
+      .eq('videoId', videoId)
+      .single();
+
+    if (!existing) {
+      // Mark video as completed
+      await supabase
+        .from('video_progress')
+        .insert({
+          userId,
+          videoId,
+          courseId,
+          completed: true,
+          completedAt: new Date().toISOString()
+        });
+    }
+
+    // Calculate overall course progress
+    const { data: courseVideos } = await supabase
+      .from('videos')
+      .select('id')
+      .eq('chapterId', 'in', `(
+        SELECT id FROM chapters WHERE "courseId" = '${courseId}'
+      )`);
+
+    const { data: completedVideos } = await supabase
+      .from('video_progress')
+      .select('videoId')
+      .eq('userId', userId)
+      .eq('courseId', courseId)
+      .eq('completed', true);
+
+    const totalVideos = courseVideos?.length || 1;
+    const completedCount = completedVideos?.length || 0;
+    const progress = Math.round((completedCount / totalVideos) * 100);
+
+    // Update enrollment progress
+    await supabase
+      .from('enrollments')
+      .update({ progress })
+      .eq('userId', userId)
+      .eq('courseId', courseId);
+
+    res.json({ success: true, progress });
+  } catch (error) {
+    console.error('Mark video complete error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+export const getVideoProgress = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.user.id;
+
+    const { data: progress } = await supabase
+      .from('video_progress')
+      .select('videoId, completed')
+      .eq('userId', userId)
+      .eq('courseId', courseId);
+
+    res.json({ success: true, progress: progress || [] });
+  } catch (error) {
+    console.error('Get video progress error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
