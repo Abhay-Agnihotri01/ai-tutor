@@ -134,7 +134,7 @@ const QuizEditor = ({ isOpen, onClose, quizId, onQuizUpdated }) => {
         marks: parseInt(currentQuestion.marks) || 1
       };
 
-      const response = await fetch('http://localhost:5000/api/quiz/questions', {
+      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/questions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -145,7 +145,19 @@ const QuizEditor = ({ isOpen, onClose, quizId, onQuizUpdated }) => {
       
       if (response.ok) {
         const data = await response.json();
-        setQuestions(prev => [...prev, data.question]);
+        console.log('Question added response:', data);
+        
+        // Create question object with proper structure
+        const newQuestion = {
+          id: data.question.id,
+          question: currentQuestion.question,
+          type: currentQuestion.type,
+          options: currentQuestion.options,
+          correctAnswer: currentQuestion.correctAnswer,
+          marks: currentQuestion.marks
+        };
+        
+        setQuestions(prev => [...prev, newQuestion]);
         resetQuestionForm();
         toast.success('Question added successfully!');
       } else {
@@ -535,7 +547,7 @@ const QuizEditor = ({ isOpen, onClose, quizId, onQuizUpdated }) => {
                       <div className="flex-1">
                         <p className="font-medium theme-text-primary mb-2">{index + 1}. {q.question}</p>
                         <div className="flex items-center space-x-4 text-sm theme-text-secondary">
-                          <span>Type: {q.type.replace('_', ' ').toUpperCase()}</span>
+                          <span>Type: {q.type ? q.type.replace('_', ' ').toUpperCase() : 'Unknown'}</span>
                           <span>Marks: {q.marks}</span>
                           {q.type !== 'true_false' && (
                             <span>Options: {q.options?.length || 0}</span>

@@ -48,33 +48,41 @@ const QuizTaker = ({ quiz, onComplete }) => {
 
     setIsSubmitting(true);
     try {
-      const responses = quiz.questions.map(q => ({
-        questionId: q.id,
-        answer: answers[q.id] || ''
-      }));
+      console.log('🔥 GOD LEVEL DEBUG - Submitting quiz:', {
+        quizId: quiz.id,
+        answers: answers,
+        questionsCount: quiz.questions.length
+      });
 
-      const response = await fetch('http://localhost:5000/api/quiz/attempt/submit', {
+      const response = await fetch(`http://localhost:5000/api/quiz/${quiz.id}/attempts`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          attemptId: quiz.attemptId,
-          responses
+          answers: answers,
+          timeTaken: quiz.timeLimit ? (quiz.timeLimit * 60) - timeLeft : 0
         })
       });
 
       const data = await response.json();
+      console.log('✅ Quiz submission response:', data);
+      
       if (data.success) {
         toast.success('Quiz submitted successfully!');
-        onComplete(data.result);
+        onComplete({
+          score: data.attempt.score,
+          totalMarks: data.attempt.totalPoints,
+          percentage: data.attempt.percentage,
+          passed: data.attempt.passed
+        });
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('Submit quiz error:', error);
-      toast.error('Failed to submit quiz');
+      console.error('💥 GOD LEVEL DEBUG - Submit quiz error:', error);
+      toast.error(error.message || 'Failed to submit quiz');
     } finally {
       setIsSubmitting(false);
     }
@@ -135,10 +143,21 @@ const QuizTaker = ({ quiz, onComplete }) => {
           </div>
 
           {quiz.description && (
-            <div className="mb-6 p-4 theme-bg-secondary rounded-lg">
-              <p className="theme-text-secondary">{quiz.description}</p>
+            <div className="mb-6 p-4 theme-bg-secondary rounded-lg border-l-4 border-blue-500">
+              <h4 className="font-medium theme-text-primary mb-2">Assignment Instructions:</h4>
+              <p className="theme-text-secondary whitespace-pre-wrap">{quiz.description}</p>
             </div>
           )}
+
+          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Submission Guidelines:</h4>
+            <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+              <li>• Upload your assignment as a PDF file</li>
+              <li>• Maximum file size: 10MB</li>
+              <li>• Make sure your file is properly formatted</li>
+              <li>• Once submitted, you cannot change your submission</li>
+            </ul>
+          </div>
 
           <div className="mb-6">
             <label className="block text-sm font-medium theme-text-primary mb-2">
@@ -179,13 +198,46 @@ const QuizTaker = ({ quiz, onComplete }) => {
     );
   }
 
-  // Safety checks
-  if (!quiz || !quiz.questions || quiz.questions.length === 0) {
+  // GOD LEVEL DEBUG - Safety checks
+  console.log('🔥 GOD LEVEL DEBUG - QuizTaker received quiz:', quiz);
+  console.log('🔍 Quiz exists:', !!quiz);
+  console.log('🔍 Quiz questions exists:', !!quiz?.questions);
+  console.log('🔍 Quiz questions length:', quiz?.questions?.length || 0);
+  console.log('🔍 Quiz questions array:', quiz?.questions);
+  
+  if (!quiz) {
+    console.log('❌ Quiz is null/undefined');
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="theme-card rounded-lg p-6 text-center">
           <h2 className="text-xl font-bold theme-text-primary mb-4">Quiz Not Available</h2>
-          <p className="theme-text-secondary mb-4">This quiz has no questions or failed to load.</p>
+          <p className="theme-text-secondary mb-4">Quiz data is missing.</p>
+          <Button onClick={() => onComplete({ error: true })}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!quiz.questions) {
+    console.log('❌ Quiz questions property is missing');
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="theme-card rounded-lg p-6 text-center">
+          <h2 className="text-xl font-bold theme-text-primary mb-4">Quiz Not Available</h2>
+          <p className="theme-text-secondary mb-4">Quiz questions property is missing.</p>
+          <Button onClick={() => onComplete({ error: true })}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (quiz.questions.length === 0) {
+    console.log('❌ Quiz has no questions (empty array)');
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="theme-card rounded-lg p-6 text-center">
+          <h2 className="text-xl font-bold theme-text-primary mb-4">Quiz Not Available</h2>
+          <p className="theme-text-secondary mb-4">This quiz has no questions.</p>
           <Button onClick={() => onComplete({ error: true })}>Go Back</Button>
         </div>
       </div>
@@ -194,9 +246,14 @@ const QuizTaker = ({ quiz, onComplete }) => {
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
+  
+  console.log('📝 Current question index:', currentQuestionIndex);
+  console.log('📝 Current question:', currentQuestion);
+  console.log('📊 Progress:', progress);
 
   // Additional safety check for current question
   if (!currentQuestion) {
+    console.log('❌ Current question is null/undefined at index:', currentQuestionIndex);
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="theme-card rounded-lg p-6 text-center">
@@ -207,6 +264,9 @@ const QuizTaker = ({ quiz, onComplete }) => {
       </div>
     );
   }
+  
+  console.log('✅ Quiz is valid, rendering quiz interface');
+  console.log('🎉 Quiz has', quiz.questions.length, 'questions');
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -221,6 +281,14 @@ const QuizTaker = ({ quiz, onComplete }) => {
             </div>
           )}
         </div>
+
+        {/* Quiz Description/Instructions */}
+        {quiz.description && (
+          <div className="mb-6 p-4 theme-bg-secondary rounded-lg border-l-4 border-blue-500">
+            <h4 className="font-medium theme-text-primary mb-2">Instructions:</h4>
+            <p className="theme-text-secondary whitespace-pre-wrap">{quiz.description}</p>
+          </div>
+        )}
 
         {/* Progress */}
         <div className="mb-6">

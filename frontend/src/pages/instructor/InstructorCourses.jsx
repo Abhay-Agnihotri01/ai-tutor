@@ -157,11 +157,15 @@ const InstructorCourses = () => {
               <div key={course.id} className="theme-card rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video relative">
                   <img
-                    src={course.thumbnail ? `http://localhost:5000${course.thumbnail}` : 'https://via.placeholder.com/400x225/6366f1/ffffff?text=Course'}
+                    src={course.thumbnail ? (
+                      course.thumbnail.startsWith('http') 
+                        ? course.thumbnail 
+                        : `http://localhost:5000${course.thumbnail}`
+                    ) : `data:image/svg+xml;base64,${btoa(`<svg width="400" height="225" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#6366f1"/><text x="50%" y="50%" font-family="Arial" font-size="16" fill="white" text-anchor="middle" dy=".3em">Course</text></svg>`)}`}
                     alt={course.title}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/400x225/6366f1/ffffff?text=Course';
+                      e.target.src = `data:image/svg+xml;base64,${btoa(`<svg width="400" height="225" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#6366f1"/><text x="50%" y="50%" font-family="Arial" font-size="16" fill="white" text-anchor="middle" dy=".3em">Course</text></svg>`)}`;
                     }}
                   />
                   <div className="absolute top-2 right-2">
@@ -191,11 +195,12 @@ const InstructorCourses = () => {
                     </div>
                   </div>
 
-                  <div className="flex space-x-2 mb-2">
+                  {/* Publish/Unpublish Button */}
+                  <div className="mb-3">
                     <Button
                       size="sm"
                       onClick={() => handlePublishCourse(course.id)}
-                      className={`flex-1 ${
+                      className={`w-full ${
                         course.isPublished 
                           ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                           : 'bg-green-600 hover:bg-green-700 text-white'
@@ -204,26 +209,39 @@ const InstructorCourses = () => {
                       {course.isPublished ? 'Unpublish' : 'Publish'}
                     </Button>
                   </div>
-                  <div className="flex space-x-2">
-                    <Link to={`/instructor/course/${course.id}/builder`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full">
-                        <Edit className="w-4 h-4 mr-1" />
-                        Build
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2">
+                    <div className="flex space-x-2">
+                      <Link to={`/instructor/course/${course.id}/edit`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full">
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit Course
+                        </Button>
+                      </Link>
+                      <Link to={`/instructor/course/${course.id}/builder`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full">
+                          Build Content
+                        </Button>
+                      </Link>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Link to={`/courses/${course.id}`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full">
+                          <Eye className="w-4 h-4 mr-1" />
+                          Preview
+                        </Button>
+                      </Link>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700 flex-1"
+                        onClick={() => handleDeleteCourse(course.id)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
                       </Button>
-                    </Link>
-                    <Link to={`/courses/${course.id}`}>
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleDeleteCourse(course.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -36,7 +36,7 @@ const PDFViewer = ({ submission, onClose, onGradeSubmit }) => {
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between p-4 bg-gray-900 text-white">
           <h3 className="text-lg font-semibold">
-            Assignment: {submission.user.firstName} {submission.user.lastName}
+            Assignment: {submission.users?.firstName || 'Unknown'} {submission.users?.lastName || 'User'}
           </h3>
           <div className="flex items-center space-x-2">
             <a
@@ -78,12 +78,12 @@ const PDFViewer = ({ submission, onClose, onGradeSubmit }) => {
         <div className="flex-1 p-4 space-y-4">
           <div>
             <label className="block text-sm font-medium theme-text-primary mb-2">
-              Score (out of {submission.totalMarks})
+              Score (out of {submission.totalMarks || submission.totalPoints || 100})
             </label>
             <input
               type="number"
               min="0"
-              max={submission.totalMarks}
+              max={submission.totalMarks || submission.totalPoints || 100}
               value={gradeForm.score}
               onChange={(e) => setGradeForm(prev => ({ ...prev, score: e.target.value }))}
               className="w-full px-3 py-2 theme-bg-secondary theme-text-primary border theme-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"

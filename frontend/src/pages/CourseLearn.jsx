@@ -7,6 +7,7 @@ import RatingModal from '../components/common/RatingModal';
 import VideoThumbnail from '../components/common/VideoThumbnail';
 import LinkifiedText from '../components/common/LinkifiedText';
 import QuizTaker from '../components/quiz/QuizTaker';
+import EnhancedVideoPlayer from '../components/common/EnhancedVideoPlayer';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 
@@ -25,7 +26,28 @@ const CourseLearn = () => {
 
   useEffect(() => {
     fetchCourse();
+    loadVideoProgress();
   }, [id]);
+  
+  const loadVideoProgress = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await axios.get(`http://localhost:5000/api/enrollments/video-progress/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        const completedVideoIds = response.data.progress
+          .filter(p => p.completed)
+          .map(p => p.videoId);
+        setCompletedLessons(new Set(completedVideoIds));
+      }
+    } catch (error) {
+      // Ignore errors for now
+    }
+  };
   
   useEffect(() => {
     if (course?.chapters) {
@@ -213,15 +235,13 @@ const CourseLearn = () => {
       newCompleted.add(currentLesson.id);
       setCompletedLessons(newCompleted);
       
-      // Calculate new progress
-      const totalLessons = course.chapters.reduce((acc, chapter) => acc + (chapter.videos?.length || 0), 0);
-      const newProgress = Math.round((newCompleted.size / totalLessons) * 100);
-      
       try {
-        await axios.put('http://localhost:5000/api/enrollments/progress', {
-          courseId: id,
-          lessonId: currentLesson.id,
-          progress: newProgress
+        const token = localStorage.getItem('token');
+        await axios.post('http://localhost:5000/api/enrollments/video-complete', {
+          videoId: currentLesson.id,
+          courseId: id
+        }, {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
         toast.success('Lesson marked as complete!');
       } catch (error) {
@@ -358,19 +378,19 @@ const CourseLearn = () => {
         <div className="flex-1 p-6">
           {currentLesson ? (
             <div className="animate-fade-in">
-              {/* Video Player */}
-              <div className="bg-black rounded-lg overflow-hidden mb-6 aspect-video">
-                <video
+              {/* Enhanced Video Player */}
+              <div className="mb-6 aspect-video">
+                <EnhancedVideoPlayer
                   key={currentLesson.id}
-                  controls
-                  controlsList="nodownload"
-                  onContextMenu={(e) => e.preventDefault()}
+                  src={currentLesson.videoUrl}
+                  poster={currentLesson.thumbnailUrl || 
+                    (currentLesson.videoUrl?.includes('cloudinary.com') ? 
+                      currentLesson.videoUrl.replace('/video/upload/', '/video/upload/so_10,w_400,h_225,c_fill,q_auto,f_jpg/').replace('.mp4', '.jpg') : 
+                      undefined
+                    )
+                  }
                   className="w-full h-full"
-                  poster={currentLesson.thumbnailUrl || undefined}
-                >
-                  <source src={currentLesson.videoUrl} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
+                />
               </div>
 
               {/* Lesson Info */}
@@ -564,30 +584,31 @@ const CourseLearn = () => {
                               key={resource.id}
                               className="p-3 theme-bg-secondary hover:theme-bg-tertiary rounded-lg border-l-4 border-green-500 transition-colors"
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3 flex-1">
+                              <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-3 flex-1 min-w-0">
                                   <div className="w-6 h-6 bg-green-100 dark:bg-green-900 rounded flex items-center justify-center flex-shrink-0">
                                     <span className="text-green-600 text-xs">📄</span>
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium theme-text-primary truncate">
+                                    <p className="text-sm font-medium theme-text-primary truncate" title={resource.title}>
                                       {resource.title}
                                     </p>
-                                    <p className="text-xs theme-text-muted">
+                                    <p className="text-xs theme-text-muted truncate">
                                       {resource.fileName} • {(resource.fileSize / 1024 / 1024).toFixed(1)}MB
                                     </p>
                                   </div>
                                 </div>
-                                <a
-                                  href={resource.fileUrl}
-                                  download={resource.fileName}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center space-x-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                                <button
+                                  onClick={() => {
+                                    const token = localStorage.getItem('token');
+                                    const url = `http://localhost:5000/api/download/resource/${resource.id}?token=${token}`;
+                                    window.open(url, '_blank');
+                                  }}
+                                  className="flex items-center space-x-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex-shrink-0"
                                 >
                                   <Download className="w-3 h-3" />
                                   <span>Download</span>
-                                </a>
+                                </button>
                               </div>
                             </div>
                           );

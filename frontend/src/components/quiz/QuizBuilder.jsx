@@ -32,7 +32,7 @@ const QuizBuilder = ({ isOpen, onClose, chapterId, videos, onQuizCreated }) => {
 
     try {
       // First create the quiz
-      const quizResponse = await fetch('http://localhost:5000/api/quiz/quizzes', {
+      const quizResponse = await fetch('http://localhost:5000/api/quiz', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -73,7 +73,7 @@ const QuizBuilder = ({ isOpen, onClose, chapterId, videos, onQuizCreated }) => {
               marks: parseInt(question.marks) || 1
             };
 
-            const questionResponse = await fetch('http://localhost:5000/api/quiz/questions', {
+            const questionResponse = await fetch(`http://localhost:5000/api/quiz/${quizData.quiz.id}/questions`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,

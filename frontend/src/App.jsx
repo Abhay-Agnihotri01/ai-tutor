@@ -18,8 +18,10 @@ import Profile from './pages/Profile';
 import MyLearning from './pages/MyLearning';
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
 import CreateCourse from './pages/instructor/CreateCourse';
+import EditCourse from './pages/instructor/EditCourse';
 import CourseBuilder from './pages/instructor/CourseBuilder';
 import InstructorCourses from './pages/instructor/InstructorCourses';
+import RevenueAnalytics from './pages/instructor/RevenueAnalytics';
 import AssignmentSubmissions from './pages/instructor/AssignmentSubmissions';
 import CourseReviews from './pages/instructor/CourseReviews';
 import axios from 'axios';
@@ -76,9 +78,11 @@ const AppContent = () => {
             <Route path="/auth/role-selection" element={<RoleSelection />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/my-learning" element={<MyLearning />} />
-            <Route path="/instructor" element={<InstructorDashboard />} />
+            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
             <Route path="/instructor/courses" element={<InstructorCourses />} />
+            <Route path="/instructor/analytics" element={<RevenueAnalytics />} />
             <Route path="/instructor/course/create" element={<CreateCourse />} />
+            <Route path="/instructor/course/:id/edit" element={<EditCourse />} />
             <Route path="/instructor/course/:id/builder" element={<CourseBuilder />} />
             <Route path="/instructor/submissions/:quizId" element={<AssignmentSubmissions />} />
             <Route path="/instructor/course/:courseId/reviews" element={<CourseReviews />} />

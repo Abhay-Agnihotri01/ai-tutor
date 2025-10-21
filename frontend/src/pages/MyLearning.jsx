@@ -56,6 +56,7 @@ const MyLearning = () => {
       if (response.ok) {
         console.log('Enrolled courses data:', data.enrollments);
         console.log('First course thumbnail:', data.enrollments?.[0]?.Course?.thumbnail);
+        console.log('Enrolled courses loaded:', data.enrollments?.length);
         setEnrolledCourses(data.enrollments || []);
       } else {
         if (response.status === 401) {
@@ -413,34 +414,25 @@ const MyLearning = () => {
               const progressPercent = enrollment.progress || 0;
               const isCompleted = progressPercent === 100;
               
+
+              
               return (
                 <div key={enrollment.id} className="theme-card rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-105">
                   <div className="aspect-video relative overflow-hidden bg-gradient-to-br from-primary-400 to-primary-600">
-                    {course?.thumbnail ? (
+                    {course?.thumbnail && (
                       <img 
-                        src={course.thumbnail.startsWith('http') ? course.thumbnail : `http://localhost:5000${course.thumbnail}`}
+                        src={course.thumbnail}
                         alt={course?.title || 'Course thumbnail'}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `
-                            <div class="w-full h-full flex items-center justify-center text-white">
-                              <div class="text-center">
-                                <div class="text-2xl font-bold mb-2">${course?.title?.charAt(0) || 'C'}</div>
-                                <div class="text-sm opacity-80">${course?.category || 'Course'}</div>
-                              </div>
-                            </div>
-                          `;
-                        }}
+                        style={{ position: 'absolute', top: 0, left: 0, zIndex: 1 }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold mb-2">{course?.title?.charAt(0) || 'C'}</div>
-                          <div className="text-sm opacity-80">{course?.category || 'Course'}</div>
-                        </div>
-                      </div>
                     )}
+                    <div className="absolute inset-0 flex items-center justify-center text-white" style={{ zIndex: 0 }}>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold mb-2">{course?.title?.charAt(0) || 'C'}</div>
+                        <div className="text-sm opacity-80">{course?.category || 'Course'}</div>
+                      </div>
+                    </div>
                     <Link 
                       to={`/learn/${course?.id}`}
                       className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-40 transition-all group"

@@ -41,6 +41,7 @@ const CourseBuilder = () => {
     category: '',
     level: '',
     price: '',
+    discountPrice: '',
     language: '',
     thumbnail: null
   });
@@ -87,8 +88,13 @@ const CourseBuilder = () => {
     try {
       const quizData = {};
       for (const chapter of chapters) {
-        const response = await fetch(`http://localhost:5000/api/quiz/chapter/${chapter.id}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        // Add cache busting to ensure fresh data
+        const timestamp = Date.now();
+        const response = await fetch(`http://localhost:5000/api/quiz/chapter/${chapter.id}?cb=${timestamp}`, {
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Cache-Control': 'no-cache'
+          }
         });
         if (response.ok) {
           const data = await response.json();
@@ -97,6 +103,7 @@ const CourseBuilder = () => {
       }
       setChapterQuizzes(quizData);
     } catch (error) {
+      console.error('Error fetching quizzes:', error);
     }
   };
 
@@ -796,6 +803,7 @@ const CourseBuilder = () => {
       formData.append('category', courseSettings.category);
       formData.append('level', courseSettings.level);
       formData.append('price', courseSettings.price);
+      formData.append('discountPrice', courseSettings.discountPrice);
       formData.append('language', courseSettings.language);
       
       if (courseSettings.thumbnail) {
@@ -1220,9 +1228,19 @@ const CourseBuilder = () => {
                 <div className="flex justify-between">
                   <span className="theme-text-muted">Duration:</span>
                   <span className="theme-text-primary">
-                    {Math.floor(chapters.reduce((sum, chapter) => 
-                      sum + chapter.videos.reduce((videoSum, video) => videoSum + video.duration, 0), 0
-                    ) / 60)} min
+                    {(() => {
+                      const totalSeconds = chapters.reduce((sum, chapter) => 
+                        sum + (chapter.videos || []).reduce((videoSum, video) => videoSum + (video.duration || 0), 0), 0
+                      );
+                      const minutes = Math.floor(totalSeconds / 60);
+                      const seconds = totalSeconds % 60;
+                      
+                      if (minutes > 0) {
+                        return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+                      } else {
+                        return `${seconds}s`;
+                      }
+                    })()} 
                   </span>
                 </div>
               </div>
@@ -1252,6 +1270,7 @@ const CourseBuilder = () => {
                       category: course?.category || '',
                       level: course?.level || '',
                       price: course?.price || '',
+                      discountPrice: course?.discountPrice || '',
                       language: course?.language || '',
                       thumbnail: null
                     });
@@ -1523,6 +1542,21 @@ const CourseBuilder = () => {
                   
                   <div>
                     <label className="block text-sm font-medium theme-text-primary mb-2">
+                      Discount Price ($)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={courseSettings.discountPrice}
+                      onChange={(e) => setCourseSettings(prev => ({ ...prev, discountPrice: e.target.value }))}
+                      className="w-full px-3 py-2 theme-bg-secondary theme-text-primary border theme-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium theme-text-primary mb-2">
                       Price ($)
                     </label>
                     <input
@@ -1639,7 +1673,7 @@ const CourseBuilder = () => {
                     className="w-full px-3 py-2 theme-bg-secondary theme-text-primary border theme-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <p className="text-xs theme-text-muted mt-1">
-                    {editingResource ? 'Leave empty to keep current file. ' : ''}Supported: PDF, DOC, PPT, XLS, ZIP, TXT (Max 50MB)
+                    {editingResource ? 'Leave empty to keep current file. ' : ''}Supported: PDF, DOC, PPT, XLS, ZIP, TXT (Max 10MB)
                   </p>
                 </div>
                 
@@ -1693,10 +1727,11 @@ const CourseBuilder = () => {
             }}
             quizId={editingQuizId}
             onQuizUpdated={async () => {
-              await fetchCourseData();
+              // Force refresh quiz data
               await fetchQuizzes();
               setShowQuizEditor(false);
               setEditingQuizId(null);
+              toast.success('Quiz updated successfully!');
             }}
           />
         )}

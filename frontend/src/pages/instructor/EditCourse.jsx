@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Plus, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Upload } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 
-const CreateCourse = () => {
+const EditCourse = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: '',
     shortDescription: '',
@@ -20,11 +22,48 @@ const CreateCourse = () => {
     thumbnail: null
   });
 
-
   const categories = [
     'Web Development', 'Mobile Development', 'Data Science', 'Machine Learning',
     'Backend Development', 'Frontend Development', 'UI/UX Design', 'DevOps', 'Cybersecurity'
   ];
+
+  useEffect(() => {
+    fetchCourse();
+  }, [id]);
+
+  const fetchCourse = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/courses/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const course = data.course;
+        setFormData({
+          title: course.title || '',
+          shortDescription: course.shortDescription || '',
+          description: course.description || '',
+          category: course.category || '',
+          level: course.level || 'beginner',
+          price: course.price || '',
+          discountPrice: course.discountPrice || '',
+          language: course.language || 'English',
+          thumbnail: null
+        });
+      } else {
+        throw new Error('Failed to fetch course');
+      }
+    } catch (error) {
+      console.error('Failed to fetch course:', error);
+      toast.error('Failed to load course data');
+      navigate('/instructor/courses');
+    } finally {
+      setFetchLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -37,8 +76,6 @@ const CreateCourse = () => {
       setFormData(prev => ({ ...prev, thumbnail: file }));
     }
   };
-
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,11 +95,9 @@ const CreateCourse = () => {
       if (formData.thumbnail) {
         courseData.append('thumbnail', formData.thumbnail);
       }
-      
 
-
-      const response = await fetch('http://localhost:5000/api/instructor/courses', {
-        method: 'POST',
+      const response = await fetch(`http://localhost:5000/api/courses/${id}`, {
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
@@ -72,18 +107,26 @@ const CreateCourse = () => {
       const result = await response.json();
       
       if (result.success) {
-        toast.success('Course created successfully!');
-        navigate('/instructor');
+        toast.success('Course updated successfully!');
+        navigate('/instructor/courses');
       } else {
-        throw new Error(result.message || 'Failed to create course');
+        throw new Error(result.message || 'Failed to update course');
       }
     } catch (error) {
-      console.error('Course creation error:', error);
-      toast.error(error.message || 'Failed to create course');
+      console.error('Course update error:', error);
+      toast.error(error.message || 'Failed to update course');
     } finally {
       setLoading(false);
     }
   };
+
+  if (fetchLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-8">
@@ -91,14 +134,14 @@ const CreateCourse = () => {
         {/* Header */}
         <div className="flex items-center mb-8">
           <button
-            onClick={() => navigate('/instructor')}
+            onClick={() => navigate('/instructor/courses')}
             className="mr-4 p-2 hover:theme-bg-secondary rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 theme-text-primary" />
           </button>
           <div>
-            <h1 className="text-3xl font-bold theme-text-primary">Create New Course</h1>
-            <p className="theme-text-secondary">Share your knowledge with the world</p>
+            <h1 className="text-3xl font-bold theme-text-primary">Edit Course</h1>
+            <p className="theme-text-secondary">Update your course information</p>
           </div>
         </div>
 
@@ -216,7 +259,8 @@ const CreateCourse = () => {
             
             <div className="border-2 border-dashed theme-border rounded-lg p-8 text-center">
               <Upload className="w-12 h-12 theme-text-muted mx-auto mb-4" />
-              <p className="theme-text-secondary mb-4">Upload course thumbnail (16:9 aspect ratio recommended)</p>
+              <p className="theme-text-secondary mb-4">Upload new course thumbnail (16:9 aspect ratio recommended)</p>
+              <p className="text-sm theme-text-muted mb-4">Leave empty to keep current thumbnail</p>
               <input
                 type="file"
                 accept="image/*"
@@ -238,19 +282,17 @@ const CreateCourse = () => {
             </div>
           </div>
 
-
-
           {/* Submit Buttons */}
           <div className="flex justify-end space-x-4">
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/instructor')}
+              onClick={() => navigate('/instructor/courses')}
             >
               Cancel
             </Button>
             <Button type="submit" loading={loading}>
-              Create Course
+              Update Course
             </Button>
           </div>
         </form>
@@ -259,4 +301,4 @@ const CreateCourse = () => {
   );
 };
 
-export default CreateCourse;
+export default EditCourse;

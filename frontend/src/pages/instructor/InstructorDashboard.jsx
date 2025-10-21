@@ -128,6 +128,39 @@ const InstructorDashboard = () => {
           </Link>
         </div>
 
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Link to="/instructor/courses" className="theme-card p-4 rounded-lg hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <BookOpen className="w-8 h-8 text-blue-600 mr-3" />
+              <div>
+                <h3 className="font-semibold theme-text-primary">Manage Courses</h3>
+                <p className="text-sm theme-text-secondary">Edit and organize your courses</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link to="/instructor/analytics" className="theme-card p-4 rounded-lg hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <TrendingUp className="w-8 h-8 text-green-600 mr-3" />
+              <div>
+                <h3 className="font-semibold theme-text-primary">Revenue Analytics</h3>
+                <p className="text-sm theme-text-secondary">Track earnings and performance</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link to="/instructor/course/create" className="theme-card p-4 rounded-lg hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <Plus className="w-8 h-8 text-purple-600 mr-3" />
+              <div>
+                <h3 className="font-semibold theme-text-primary">Create Course</h3>
+                <p className="text-sm theme-text-secondary">Start a new course</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="theme-card p-6 rounded-lg">
@@ -268,26 +301,37 @@ const InstructorDashboard = () => {
                         {course.isPublished ? 'Unpublish' : 'Publish'}
                       </Button>
                     </div>
-                    <div className="flex space-x-2">
-                      <Link to={`/instructor/course/${course.id}/builder`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full">
-                          <Edit className="w-4 h-4 mr-1" />
-                          Build
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <Link to={`/instructor/course/${course.id}/edit`} className="flex-1">
+                          <Button variant="outline" size="sm" className="w-full">
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
+                          </Button>
+                        </Link>
+                        <Link to={`/instructor/course/${course.id}/builder`} className="flex-1">
+                          <Button variant="outline" size="sm" className="w-full">
+                            Build
+                          </Button>
+                        </Link>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link to={`/courses/${course.id}`} className="flex-1">
+                          <Button variant="outline" size="sm" className="w-full">
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        </Link>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-red-600 hover:text-red-700 flex-1"
+                          onClick={() => handleDeleteCourse(course.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
                         </Button>
-                      </Link>
-                      <Link to={`/courses/${course.id}`}>
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteCourse(course.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

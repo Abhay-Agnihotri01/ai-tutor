@@ -192,10 +192,10 @@ const AssignmentSubmissions = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium theme-text-primary">
-                            {submission.user.firstName} {submission.user.lastName}
+                            {submission.users?.firstName || 'Unknown'} {submission.users?.lastName || 'User'}
                           </div>
                           <div className="text-sm theme-text-muted">
-                            {submission.user.email}
+                            {submission.users?.email || 'No email'}
                           </div>
                         </div>
                       </td>
@@ -274,7 +274,7 @@ const AssignmentSubmissions = () => {
                   Grade Assignment
                 </h3>
                 <p className="theme-text-secondary">
-                  {gradingSubmission.user.firstName} {gradingSubmission.user.lastName}
+                  {gradingSubmission.users?.firstName || 'Unknown'} {gradingSubmission.users?.lastName || 'User'}
                 </p>
               </div>
               

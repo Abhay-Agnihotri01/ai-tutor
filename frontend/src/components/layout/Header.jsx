@@ -93,7 +93,7 @@ const Header = () => {
                     <div className="p-1">
                       {user?.role === 'instructor' ? (
                         <Link
-                          to="/instructor"
+                          to="/instructor/dashboard"
                           className="flex items-center space-x-2 w-full p-2 text-left hover:theme-bg-secondary rounded theme-text-primary"
                         >
                           <User className="w-4 h-4" />
