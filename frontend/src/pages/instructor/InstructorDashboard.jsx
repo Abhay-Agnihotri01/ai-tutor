@@ -15,6 +15,12 @@ const InstructorDashboard = () => {
   });
   const { user, isAuthenticated, loading } = useAuth();
 
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'instructor') {
+      fetchInstructorData();
+    }
+  }, [isAuthenticated, user?.role]);
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -26,10 +32,6 @@ const InstructorDashboard = () => {
   if (user?.role !== 'instructor') {
     return <Navigate to="/" replace />;
   }
-
-  useEffect(() => {
-    fetchInstructorData();
-  }, []);
 
   const handlePublishCourse = async (courseId) => {
     try {

@@ -213,13 +213,23 @@ export const verifyPayment = async (req, res) => {
         return res.status(400).json({ message: 'Already enrolled in this course' });
       }
 
-      // Create enrollment
+      // Get course price for revenue tracking
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('price, discountPrice')
+        .eq('id', courseId)
+        .single();
+      
+      const pricePaid = courseData?.discountPrice || courseData?.price || 0;
+
+      // Create enrollment with price paid
       const { data: enrollment, error: enrollError } = await supabase
         .from('enrollments')
         .insert({
           userId,
           courseId,
-          progress: 0
+          progress: 0,
+          pricePaid: parseFloat(pricePaid)
         })
         .select()
         .single();
@@ -249,12 +259,24 @@ export const verifyPayment = async (req, res) => {
         return res.status(400).json({ message: 'Already enrolled in all courses' });
       }
 
-      // Create enrollments for all courses
-      const enrollmentData = coursesToEnroll.map(courseId => ({
-        userId,
-        courseId,
-        progress: 0
-      }));
+      // Get course prices for revenue tracking
+      const { data: coursePrices } = await supabase
+        .from('courses')
+        .select('id, price, discountPrice')
+        .in('id', coursesToEnroll);
+
+      // Create enrollments for all courses with price paid
+      const enrollmentData = coursesToEnroll.map(courseId => {
+        const coursePrice = coursePrices?.find(c => c.id === courseId);
+        const pricePaid = coursePrice?.discountPrice || coursePrice?.price || 0;
+        
+        return {
+          userId,
+          courseId,
+          progress: 0,
+          pricePaid: parseFloat(pricePaid)
+        };
+      });
 
       const { data: enrollments, error: enrollError } = await supabase
         .from('enrollments')
