@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, Clock, Users, Play, BookOpen, Award, MessageSquare } from 'lucide-react';
+import { Star, Clock, Users, Play, BookOpen, Award, MessageSquare, Heart, ShoppingCart } from 'lucide-react';
 import Button from '../components/common/Button';
 import StarRating from '../components/common/StarRating';
 import VideoThumbnail from '../components/common/VideoThumbnail';
 import PaymentModal from '../components/common/PaymentModal';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../hooks/useCart';
+import { useWishlist } from '../hooks/useWishlist';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 
@@ -17,14 +19,22 @@ const CourseDetail = () => {
   const [ratingsLoading, setRatingsLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
+  const [inCart, setInCart] = useState(false);
   const { isAuthenticated } = useAuth();
+  const { addToCart, loading: cartLoading } = useCart();
+  const { addToWishlist, removeFromWishlist, checkWishlistStatus, loading: wishlistLoading } = useWishlist();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchCourse();
     fetchRatings();
     checkEnrollment();
-  }, [id]);
+    if (isAuthenticated) {
+      checkWishlistStatus(id).then(setInWishlist);
+      checkCartStatus();
+    }
+  }, [id, isAuthenticated]);
 
   const fetchCourse = async () => {
     try {
@@ -68,6 +78,23 @@ const CourseDetail = () => {
     }
   };
 
+  const checkCartStatus = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const response = await axios.get('http://localhost:5000/api/cart', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.data.success) {
+        const inCart = response.data.cart.some(item => item.courses.id === id);
+        setInCart(inCart);
+        console.log('Cart status check:', { courseId: id, inCart, cartItems: response.data.cart.length });
+      }
+    } catch (error) {
+      console.error('Error checking cart status:', error);
+    }
+  };
+
   const handleEnroll = async () => {
     if (!isAuthenticated) {
       toast.error('Please login to enroll in courses');
@@ -106,6 +133,32 @@ const CourseDetail = () => {
     }
     
     setShowPaymentModal(true);
+  };
+
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to add courses to cart');
+      return;
+    }
+    const success = await addToCart(id);
+    if (success) {
+      setInCart(true);
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to add courses to wishlist');
+      return;
+    }
+    
+    if (inWishlist) {
+      const success = await removeFromWishlist(id);
+      if (success) setInWishlist(false);
+    } else {
+      const success = await addToWishlist(id);
+      if (success) setInWishlist(true);
+    }
   };
 
   const handlePaymentSuccess = () => {
@@ -360,10 +413,54 @@ const CourseDetail = () => {
                   </div>
                 </div>
 
-                {/* Enroll Button */}
-                <Button onClick={handleEnroll} className="w-full mb-4" size="lg">
-                  {isEnrolled ? 'Continue Learning' : course.price === 0 ? 'Enroll for Free' : 'Enroll Now'}
-                </Button>
+                {/* Action Buttons */}
+                {isEnrolled ? (
+                  <Button onClick={handleEnroll} className="w-full mb-4" size="lg">
+                    Continue Learning
+                  </Button>
+                ) : (
+                  <div className="space-y-3 mb-4">
+                    {course.price === 0 ? (
+                      <Button onClick={handleEnroll} className="w-full" size="lg">
+                        Enroll for Free
+                      </Button>
+                    ) : (
+                      <>
+                        <Button onClick={handleAddToCart} className="w-full" size="lg" disabled={cartLoading || inCart}>
+                          <ShoppingCart className="w-5 h-5 mr-2" />
+                          {inCart ? 'Already in Cart' : 'Add to Cart'}
+                        </Button>
+                        <Button onClick={handleEnroll} variant="outline" className="w-full" size="lg">
+                          Buy Now
+                        </Button>
+                      </>
+                    )}
+                    
+                    <button
+                      onClick={handleWishlistToggle}
+                      disabled={wishlistLoading}
+                      className={`w-full flex items-center justify-center space-x-2 p-3 rounded-lg border transition-all duration-200 ${
+                        inWishlist 
+                          ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
+                          : 'theme-bg-secondary theme-border theme-text-muted hover:text-red-500'
+                      }`}
+                    >
+                      <Heart className={`w-5 h-5 ${inWishlist ? 'fill-current' : ''}`} />
+                      <span>{inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Trust Indicators */}
+                {!isEnrolled && (
+                  <div className="mb-6 p-4 theme-bg-secondary rounded-lg">
+                    <div className="space-y-2 text-sm theme-text-muted">
+                      <p>✓ 30-day money-back guarantee</p>
+                      <p>✓ Lifetime access</p>
+                      <p>✓ Certificate of completion</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Course Includes */}
                 <div className="space-y-3 text-sm">

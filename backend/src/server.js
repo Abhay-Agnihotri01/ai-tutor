@@ -28,6 +28,8 @@ import textLectureRoutes from './routes/textLectureRoutes.js';
 import textLectureNotesRoutes from './routes/textLectureNotesRoutes.js';
 import liveClassRoutes from './routes/liveClassRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import cartRoutes from './routes/cartRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js';
 
 import passport from './config/passport.js';
 
@@ -878,6 +880,8 @@ app.use('/api', textLectureNotesRoutes);
 app.use('/api/text-lectures', textLectureRoutes);
 app.use('/api/live-classes', liveClassRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 app.use('/api', chapterRoutes);
 
 // Debug enrollments

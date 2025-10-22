@@ -27,6 +27,8 @@ import CourseReviews from './pages/instructor/CourseReviews';
 import CreateTextLecture from './components/instructor/CreateTextLecture';
 import GradeSubmission from './pages/instructor/GradeSubmission';
 import JitsiLiveClassRoom from './components/live/JitsiLiveClassRoom';
+import Cart from './pages/Cart';
+import Wishlist from './pages/Wishlist';
 import axios from 'axios';
 
 // Configure axios defaults
@@ -94,6 +96,8 @@ const AppContent = () => {
             <Route path="/instructor/grade/:submissionId" element={<GradeSubmission />} />
             <Route path="/instructor/live-class/:meetingId" element={<JitsiLiveClassRoom />} />
         <Route path="/student/live-class/:meetingId" element={<JitsiLiveClassRoom />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="*" element={<div className="p-8 text-center theme-text-primary">404 - Page Not Found</div>} />
           </Routes>
         </main>

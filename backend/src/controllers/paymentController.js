@@ -16,7 +16,7 @@ const getRazorpayInstance = () => {
 
 export const createOrder = async (req, res) => {
   try {
-    const { courseId } = req.body;
+    const { courseId, courses, totalAmount } = req.body;
     const userId = req.user.id;
 
     let razorpay;
@@ -26,79 +26,143 @@ export const createOrder = async (req, res) => {
       return res.status(500).json({ message: 'Payment gateway not configured', error: error.message });
     }
 
-    // Check if course exists
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('id', courseId)
-      .single();
-
-    if (courseError || !course) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-
-    // Check if already enrolled
-    const { data: existingEnrollment } = await supabase
-      .from('enrollments')
-      .select('id')
-      .eq('userId', userId)
-      .eq('courseId', courseId)
-      .single();
-
-    if (existingEnrollment) {
-      return res.status(400).json({ message: 'Already enrolled in this course' });
-    }
-
-    // For free courses, enroll directly
-    const finalPrice = course.discountPrice !== null ? course.discountPrice : course.price;
-    const numericPrice = parseFloat(finalPrice);
-
-    if (numericPrice === 0) {
-      const { data: enrollment, error: enrollError } = await supabase
-        .from('enrollments')
-        .insert({
-          userId,
-          courseId,
-          progress: 0
-        })
-        .select()
+    // Handle single course (existing functionality)
+    if (courseId && !courses) {
+      // Check if course exists
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
         .single();
 
-      if (enrollError) throw enrollError;
+      if (courseError || !course) {
+        return res.status(404).json({ message: 'Course not found' });
+      }
+
+      // Check if already enrolled
+      const { data: existingEnrollment } = await supabase
+        .from('enrollments')
+        .select('id')
+        .eq('userId', userId)
+        .eq('courseId', courseId)
+        .single();
+
+      if (existingEnrollment) {
+        return res.status(400).json({ message: 'Already enrolled in this course' });
+      }
+
+      // For free courses, enroll directly
+      const finalPrice = course.discountPrice !== null ? course.discountPrice : course.price;
+      const numericPrice = parseFloat(finalPrice);
+
+      if (numericPrice === 0) {
+        const { data: enrollment, error: enrollError } = await supabase
+          .from('enrollments')
+          .insert({
+            userId,
+            courseId,
+            progress: 0
+          })
+          .select()
+          .single();
+
+        if (enrollError) throw enrollError;
+
+        return res.json({
+          success: true,
+          enrollment,
+          message: 'Enrolled in free course successfully'
+        });
+      }
+
+      // Create Razorpay order for single course
+      const amount = Math.round((course.discountPrice || course.price) * 100);
+      const options = {
+        amount,
+        currency: 'INR',
+        receipt: `course_${Date.now()}`,
+        notes: {
+          courseId,
+          userId,
+          courseTitle: course.title
+        }
+      };
+
+      const order = await razorpay.orders.create(options);
 
       return res.json({
         success: true,
-        enrollment,
-        message: 'Enrolled in free course successfully'
+        order: {
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          courseId,
+          courseTitle: course.title,
+          coursePrice: course.discountPrice || course.price
+        }
       });
     }
 
-    // Create Razorpay order
-    const amount = Math.round((course.discountPrice || course.price) * 100);
-    const options = {
-      amount,
-      currency: 'INR',
-      receipt: `course_${Date.now()}`,
-      notes: {
-        courseId,
-        userId,
-        courseTitle: course.title
-      }
-    };
+    // Handle multiple courses (cart checkout)
+    if (courses && Array.isArray(courses)) {
+      // Validate all courses exist and user not enrolled
+      const courseIds = courses.map(c => c.courseId);
+      
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select('*')
+        .in('id', courseIds);
 
-    const order = await razorpay.orders.create(options);
-
-    res.json({
-      success: true,
-      order: {
-        id: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        courseId,
-        courseTitle: course.title,
-        coursePrice: course.discountPrice || course.price
+      if (coursesError || !coursesData || coursesData.length !== courses.length) {
+        return res.status(404).json({ message: 'One or more courses not found' });
       }
-    });
+
+      // Check for existing enrollments
+      const { data: existingEnrollments } = await supabase
+        .from('enrollments')
+        .select('courseId')
+        .eq('userId', userId)
+        .in('courseId', courseIds);
+
+      if (existingEnrollments && existingEnrollments.length > 0) {
+        const enrolledCourseIds = existingEnrollments.map(e => e.courseId);
+        const enrolledCourses = coursesData.filter(c => enrolledCourseIds.includes(c.id));
+        return res.status(400).json({ 
+          message: `Already enrolled in: ${enrolledCourses.map(c => c.title).join(', ')}` 
+        });
+      }
+
+      // Create Razorpay order for cart
+      const amount = Math.round(totalAmount * 100);
+      const options = {
+        amount,
+        currency: 'INR',
+        receipt: `cart_${Date.now()}`,
+        notes: {
+          userId,
+          courseCount: courses.length,
+          courseIds: courseIds.join(',')
+        }
+      };
+
+      const order = await razorpay.orders.create(options);
+
+      return res.json({
+        success: true,
+        order: {
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          courses: coursesData.map(course => ({
+            id: course.id,
+            title: course.title,
+            price: course.discountPrice || course.price
+          }))
+        }
+      });
+    }
+
+    return res.status(400).json({ message: 'Invalid request parameters' });
   } catch (error) {
     console.error('Create order error:', error);
     res.status(500).json({ message: 'Failed to create order', error: error.message });
@@ -111,7 +175,8 @@ export const verifyPayment = async (req, res) => {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      courseId
+      courseId,
+      courses
     } = req.body;
     const userId = req.user.id;
 
@@ -134,36 +199,86 @@ export const verifyPayment = async (req, res) => {
       return res.status(400).json({ message: 'Payment not captured' });
     }
 
-    // Check if already enrolled (double-check)
-    const { data: existingEnrollment } = await supabase
-      .from('enrollments')
-      .select('id')
-      .eq('userId', userId)
-      .eq('courseId', courseId)
-      .single();
+    // Handle single course enrollment
+    if (courseId && !courses) {
+      // Check if already enrolled (double-check)
+      const { data: existingEnrollment } = await supabase
+        .from('enrollments')
+        .select('id')
+        .eq('userId', userId)
+        .eq('courseId', courseId)
+        .single();
 
-    if (existingEnrollment) {
-      return res.status(400).json({ message: 'Already enrolled in this course' });
+      if (existingEnrollment) {
+        return res.status(400).json({ message: 'Already enrolled in this course' });
+      }
+
+      // Create enrollment
+      const { data: enrollment, error: enrollError } = await supabase
+        .from('enrollments')
+        .insert({
+          userId,
+          courseId,
+          progress: 0
+        })
+        .select()
+        .single();
+
+      if (enrollError) throw enrollError;
+
+      return res.json({
+        success: true,
+        enrollment,
+        message: 'Payment verified and enrollment completed successfully'
+      });
     }
 
-    // Create enrollment
-    const { data: enrollment, error: enrollError } = await supabase
-      .from('enrollments')
-      .insert({
+    // Handle multiple course enrollments (cart)
+    if (courses && Array.isArray(courses)) {
+      // Check for existing enrollments
+      const { data: existingEnrollments } = await supabase
+        .from('enrollments')
+        .select('courseId')
+        .eq('userId', userId)
+        .in('courseId', courses);
+
+      const alreadyEnrolled = existingEnrollments?.map(e => e.courseId) || [];
+      const coursesToEnroll = courses.filter(courseId => !alreadyEnrolled.includes(courseId));
+
+      if (coursesToEnroll.length === 0) {
+        return res.status(400).json({ message: 'Already enrolled in all courses' });
+      }
+
+      // Create enrollments for all courses
+      const enrollmentData = coursesToEnroll.map(courseId => ({
         userId,
         courseId,
         progress: 0
-      })
-      .select()
-      .single();
+      }));
 
-    if (enrollError) throw enrollError;
+      const { data: enrollments, error: enrollError } = await supabase
+        .from('enrollments')
+        .insert(enrollmentData)
+        .select();
 
-    res.json({
-      success: true,
-      enrollment,
-      message: 'Payment verified and enrollment completed successfully'
-    });
+      if (enrollError) throw enrollError;
+
+      // Clear cart after successful enrollment
+      await supabase
+        .from('cart')
+        .delete()
+        .eq('userId', userId)
+        .in('courseId', courses);
+
+      return res.json({
+        success: true,
+        enrollments,
+        enrolledCount: enrollments.length,
+        message: `Successfully enrolled in ${enrollments.length} course${enrollments.length > 1 ? 's' : ''}`
+      });
+    }
+
+    return res.status(400).json({ message: 'Invalid request parameters' });
   } catch (error) {
     console.error('Verify payment error:', error);
     res.status(500).json({ message: 'Payment verification failed', error: error.message });
