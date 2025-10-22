@@ -91,6 +91,26 @@ export const getCourse = async (req, res) => {
       .eq('courseId', id)
       .order('order', { ascending: true });
 
+    // Try to fetch text lectures separately (table might not exist yet)
+    let textLectures = [];
+    try {
+      const { data: textLectureData } = await supabase
+        .from('text_lectures')
+        .select('*')
+        .eq('courseId', id)
+        .order('order', { ascending: true });
+      textLectures = textLectureData || [];
+    } catch (error) {
+      // text_lectures table doesn't exist yet, ignore
+    }
+
+    // Add text lectures to their respective chapters
+    if (chapters && textLectures.length > 0) {
+      chapters.forEach(chapter => {
+        chapter.text_lectures = textLectures.filter(tl => tl.chapterId === chapter.id);
+      });
+    }
+
     if (chaptersError) throw chaptersError;
 
     // Get current rating from database (in case it was recently updated)

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, GripVertical, Play, Upload, Edit, Trash2, FolderPlus, X, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Plus, GripVertical, Play, Upload, Edit, Trash2, FolderPlus, X, HelpCircle, FileText, ChevronDown, Video, MessageCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Button from '../../components/common/Button';
 import QuizBuilder from '../../components/quiz/QuizBuilder';
 import QuizEditor from '../../components/quiz/QuizEditor';
+import LiveClassScheduler from '../../components/live/LiveClassScheduler';
+import NotificationCenter from '../../components/instructor/NotificationCenter';
 
 const CourseBuilder = () => {
   const { id } = useParams();
@@ -34,6 +36,11 @@ const CourseBuilder = () => {
   const [chapterQuizzes, setChapterQuizzes] = useState({});
   const [showQuizEditor, setShowQuizEditor] = useState(false);
   const [editingQuizId, setEditingQuizId] = useState(null);
+  const [showAddDropdown, setShowAddDropdown] = useState(null);
+  const [showLiveClassScheduler, setShowLiveClassScheduler] = useState(false);
+  const [selectedChapterForLiveClass, setSelectedChapterForLiveClass] = useState(null);
+  const [liveClasses, setLiveClasses] = useState([]);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [courseSettings, setCourseSettings] = useState({
     title: '',
     shortDescription: '',
@@ -54,8 +61,36 @@ const CourseBuilder = () => {
   useEffect(() => {
     if (chapters.length > 0) {
       fetchQuizzes();
+      fetchLiveClasses();
     }
   }, [chapters]);
+
+  const fetchLiveClasses = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/live-classes/course/${id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setLiveClasses(data.liveClasses || []);
+      }
+    } catch (error) {
+      console.error('Error fetching live classes:', error);
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showAddDropdown && !event.target.closest('.add-content-dropdown')) {
+        setShowAddDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAddDropdown]);
 
   const fetchCourseData = async () => {
     try {
@@ -598,17 +633,18 @@ const CourseBuilder = () => {
       }
     }
     
-    // Handle mixed content reordering within same chapter (allow video-resource mixing)
-    if ((draggedItem.type === 'video' || draggedItem.type === 'resource') && 
-        (targetType === 'video' || targetType === 'resource') && 
+    // Handle mixed content reordering within same chapter (allow video-resource-text_lecture mixing)
+    if ((draggedItem.type === 'video' || draggedItem.type === 'resource' || draggedItem.type === 'text_lecture') && 
+        (targetType === 'video' || targetType === 'resource' || targetType === 'text_lecture') && 
         draggedItem.chapterId === targetChapterId) {
       
       setChapters(prev => prev.map(chapter => {
         if (chapter.id === targetChapterId) {
-          // Combine videos and resources into one array with type info
+          // Combine videos, resources, and text lectures into one array with type info
           const allContent = [
             ...(chapter.videos || []).map(v => ({ ...v, contentType: 'video' })),
-            ...(chapter.resources || []).map(r => ({ ...r, contentType: 'resource' }))
+            ...(chapter.resources || []).map(r => ({ ...r, contentType: 'resource' })),
+            ...(chapter.text_lectures || []).map(t => ({ ...t, contentType: 'text_lecture' }))
           ].sort((a, b) => a.order - b.order);
           
           const draggedItemId = typeof draggedItem.item === 'string' ? draggedItem.item : draggedItem.item.id;
@@ -629,14 +665,16 @@ const CourseBuilder = () => {
             order: index + 1
           }));
           
-          // Separate back into videos and resources
+          // Separate back into videos, resources, and text lectures
           const updatedVideos = updatedContent.filter(item => item.contentType === 'video');
           const updatedResources = updatedContent.filter(item => item.contentType === 'resource');
+          const updatedTextLectures = updatedContent.filter(item => item.contentType === 'text_lecture');
           
-          // Save to backend - update both videos and resources with new order
+          // Save to backend - update videos, resources, and text lectures with new order
           Promise.all([
             updatedVideos.length > 0 ? updateVideoOrder(updatedVideos) : Promise.resolve(),
-            updatedResources.length > 0 ? updateResourceOrder(updatedResources) : Promise.resolve()
+            updatedResources.length > 0 ? updateResourceOrder(updatedResources) : Promise.resolve(),
+            updatedTextLectures.length > 0 ? updateTextLectureOrder(updatedTextLectures) : Promise.resolve()
           ]).catch((error) => {
             toast.error('Failed to save content order');
             fetchCourseData();
@@ -645,7 +683,8 @@ const CourseBuilder = () => {
           return { 
             ...chapter, 
             videos: updatedVideos,
-            resources: updatedResources
+            resources: updatedResources,
+            text_lectures: updatedTextLectures
           };
         }
         return chapter;
@@ -708,6 +747,26 @@ const CourseBuilder = () => {
     
     if (!response.ok) {
       throw new Error('Failed to reorder videos');
+    }
+  };
+
+  const updateTextLectureOrder = async (textLectures) => {
+    const updates = textLectures.map(textLecture => ({
+      id: textLecture.id,
+      order: textLecture.order
+    }));
+    
+    const response = await fetch('http://localhost:5000/api/text-lectures/reorder', {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ textLectures: updates })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to reorder text lectures');
     }
   };
 
@@ -881,7 +940,7 @@ const CourseBuilder = () => {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <button
-              onClick={() => navigate('/instructor')}
+              onClick={() => navigate('/instructor/dashboard')}
               className="mr-4 p-2 hover:theme-bg-secondary rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 theme-text-primary" />
@@ -937,37 +996,86 @@ const CourseBuilder = () => {
                         </button>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addVideo(chapter.id)}
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Video
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addResource(chapter.id)}
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Resource
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedChapterForQuiz(chapter.id);
-                            setShowQuizBuilder(true);
-                          }}
-                        >
-                          <HelpCircle className="w-4 h-4 mr-1" />
-                          Add Quiz
-                        </Button>
+                        {/* Add Content Dropdown */}
+                        <div className="relative add-content-dropdown">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowAddDropdown(showAddDropdown === chapter.id ? null : chapter.id)}
+                            className="flex items-center space-x-1"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Content</span>
+                            <ChevronDown className={`w-3 h-3 transition-transform ${showAddDropdown === chapter.id ? 'rotate-180' : ''}`} />
+                          </Button>
+                          
+                          {showAddDropdown === chapter.id && (
+                            <div className="absolute top-full left-0 mt-1 w-48 theme-card border theme-border rounded-lg shadow-lg z-10">
+                              <div className="py-1">
+                                <button
+                                  onClick={() => {
+                                    addVideo(chapter.id);
+                                    setShowAddDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:theme-bg-secondary flex items-center space-x-2 theme-text-primary transition-colors"
+                                >
+                                  <Play className="w-4 h-4 text-blue-500" />
+                                  <span>Video Lecture</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    navigate(`/instructor/text-lecture/create?chapterId=${chapter.id}&courseId=${id}`);
+                                    setShowAddDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:theme-bg-secondary flex items-center space-x-2 theme-text-primary transition-colors"
+                                >
+                                  <FileText className="w-4 h-4 text-green-500" />
+                                  <span>Text Lecture</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    addResource(chapter.id);
+                                    setShowAddDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:theme-bg-secondary flex items-center space-x-2 theme-text-primary transition-colors"
+                                >
+                                  <Upload className="w-4 h-4 text-purple-500" />
+                                  <span>Resource File</span>
+                                </button>
+                                <hr className="my-1 theme-border" />
+                                <button
+                                  onClick={() => {
+                                    setSelectedChapterForQuiz(chapter.id);
+                                    setShowQuizBuilder(true);
+                                    setShowAddDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:theme-bg-secondary flex items-center space-x-2 theme-text-primary transition-colors"
+                                >
+                                  <HelpCircle className="w-4 h-4 text-orange-500" />
+                                  <span>Quiz/Assignment</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedChapterForLiveClass(chapter.id);
+                                    setShowLiveClassScheduler(true);
+                                    setShowAddDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:theme-bg-secondary flex items-center space-x-2 theme-text-primary transition-colors"
+                                >
+                                  <Video className="w-4 h-4 text-red-500" />
+                                  <span>Live Class</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Chapter Actions */}
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => editChapter(chapter.id, chapter.title)}
+                          title="Edit chapter"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -976,6 +1084,7 @@ const CourseBuilder = () => {
                           variant="outline"
                           onClick={() => deleteChapter(chapter.id)}
                           className="text-red-600 hover:text-red-700"
+                          title="Delete chapter"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -984,10 +1093,11 @@ const CourseBuilder = () => {
 
                     {/* Mixed Content (Videos and Resources) */}
                     <div className="p-4 space-y-2">
-                      {/* Combine and sort videos and resources by order */}
+                      {/* Combine and sort videos, resources, and text lectures by order */}
                       {[
                         ...(chapter.videos || []).map(v => ({ ...v, contentType: 'video' })),
-                        ...(chapter.resources || []).map(r => ({ ...r, contentType: 'resource' }))
+                        ...(chapter.resources || []).map(r => ({ ...r, contentType: 'resource' })),
+                        ...(chapter.text_lectures || []).map(t => ({ ...t, contentType: 'text_lecture' }))
                       ]
                       .sort((a, b) => a.order - b.order)
                       .map((item) => {
@@ -1062,7 +1172,7 @@ const CourseBuilder = () => {
                               </div>
                             </div>
                           );
-                        } else {
+                        } else if (item.contentType === 'resource') {
                           return (
                             <div
                               key={`resource-${item.id}`}
@@ -1106,6 +1216,79 @@ const CourseBuilder = () => {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => deleteResource(chapter.id, item.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          // Text lecture
+                          return (
+                            <div
+                              key={`text-lecture-${item.id}`}
+                              className="flex items-center justify-between p-3 theme-bg-tertiary rounded-lg border-l-4 border-blue-500"
+                              draggable
+                              onDragStart={(e) => {
+                                e.stopPropagation();
+                                handleDragStart(e, 'text_lecture', item, chapter.id);
+                              }}
+                              onDragOver={(e) => {
+                                e.stopPropagation();
+                                handleDragOver(e);
+                              }}
+                              onDrop={(e) => {
+                                e.stopPropagation();
+                                handleDrop(e, 'text_lecture', item.id, chapter.id);
+                              }}
+                            >
+                              <div className="flex items-center space-x-3 flex-1">
+                                <GripVertical className="w-4 h-4 theme-text-muted cursor-move" />
+                                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded flex items-center justify-center">
+                                  <FileText className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="theme-text-primary font-medium">{item.title}</p>
+                                  <p className="text-xs theme-text-muted">
+                                    {item.uploadType === 'url' ? 'Web Content' : item.fileName}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (item.uploadType === 'url') {
+                                      window.open(item.filePath, '_blank');
+                                    } else {
+                                      window.open(`http://localhost:5000${item.filePath}`, '_blank');
+                                    }
+                                  }}
+                                  title="View text lecture"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    if (window.confirm('Delete this text lecture?')) {
+                                      try {
+                                        const response = await fetch(`http://localhost:5000/api/text-lectures/${item.id}`, {
+                                          method: 'DELETE',
+                                          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                        });
+                                        if (response.ok) {
+                                          await fetchCourseData();
+                                          toast.success('Text lecture deleted successfully');
+                                        }
+                                      } catch (error) {
+                                        toast.error('Failed to delete text lecture');
+                                      }
+                                    }
+                                  }}
                                   className="text-red-600 hover:text-red-700"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1246,6 +1429,122 @@ const CourseBuilder = () => {
               </div>
             </div>
 
+            {/* Live Classes Section */}
+            <div className="theme-card p-4 rounded-lg">
+              <h3 className="font-semibold theme-text-primary mb-3 flex items-center">
+                <Video className="w-4 h-4 mr-2 text-red-500" />
+                Live Classes ({liveClasses.length})
+              </h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {liveClasses.length > 0 ? (
+                  liveClasses.map((liveClass) => {
+                    const scheduledDate = new Date(liveClass.scheduledAt);
+                    const isUpcoming = scheduledDate > new Date();
+                    const isLive = liveClass.status === 'live';
+                    
+                    return (
+                      <div key={liveClass.id} className="p-3 theme-bg-secondary rounded-lg border theme-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium theme-text-primary truncate">{liveClass.title}</h4>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            isLive ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                            isUpcoming ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                          }`}>
+                            {isLive ? '🔴 LIVE' : liveClass.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-xs theme-text-muted mb-2">
+                          {scheduledDate.toLocaleDateString()} at {scheduledDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                        <div className="flex space-x-1">
+                          {liveClass.status === 'scheduled' && (
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`http://localhost:5000/api/live-classes/${liveClass.id}/start`, {
+                                    method: 'PATCH',
+                                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                  });
+                                  if (response.ok) {
+                                    await fetchLiveClasses();
+                                    window.open(liveClass.meetingUrl, '_blank');
+                                    toast.success('Live class started!');
+                                  }
+                                } catch (error) {
+                                  toast.error('Failed to start live class');
+                                }
+                              }}
+                              className="bg-green-600 hover:bg-green-700 text-xs"
+                            >
+                              Start Meeting
+                            </Button>
+                          )}
+                          {isLive && (
+                            <Button
+                              size="sm"
+                              onClick={() => window.open(liveClass.meetingUrl, '_blank')}
+                              className="bg-red-600 hover:bg-red-700 text-xs"
+                            >
+                              Join Live
+                            </Button>
+                          )}
+                          {isLive && (
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`http://localhost:5000/api/live-classes/${liveClass.id}/end`, {
+                                    method: 'PATCH',
+                                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                  });
+                                  if (response.ok) {
+                                    await fetchLiveClasses();
+                                    toast.success('Live class ended');
+                                  }
+                                } catch (error) {
+                                  toast.error('Failed to end live class');
+                                }
+                              }}
+                              className="bg-orange-600 hover:bg-orange-700 text-xs"
+                            >
+                              End Meeting
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (window.confirm('Delete this live class?')) {
+                                try {
+                                  const response = await fetch(`http://localhost:5000/api/live-classes/${liveClass.id}`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                  });
+                                  if (response.ok) {
+                                    await fetchLiveClasses();
+                                    toast.success('Live class deleted successfully');
+                                  }
+                                } catch (error) {
+                                  toast.error('Failed to delete live class');
+                                }
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700 text-xs"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm theme-text-muted text-center py-4">No live classes scheduled</p>
+                )}
+              </div>
+            </div>
+
             <div className="theme-card p-4 rounded-lg">
               <h3 className="font-semibold theme-text-primary mb-3">Quick Actions</h3>
               <div className="space-y-2">
@@ -1279,6 +1578,15 @@ const CourseBuilder = () => {
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Course Settings
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start"
+                  onClick={() => setShowNotificationCenter(true)}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Send Message
                 </Button>
               </div>
             </div>
@@ -1734,6 +2042,50 @@ const CourseBuilder = () => {
               toast.success('Quiz updated successfully!');
             }}
           />
+        )}
+
+        {/* Live Class Scheduler Modal */}
+        {showLiveClassScheduler && (
+          <LiveClassScheduler
+            isOpen={showLiveClassScheduler}
+            onClose={() => {
+              setShowLiveClassScheduler(false);
+              setSelectedChapterForLiveClass(null);
+            }}
+            courseId={id}
+            chapterId={selectedChapterForLiveClass}
+            onScheduled={async () => {
+              await fetchCourseData();
+              await fetchLiveClasses();
+              setShowLiveClassScheduler(false);
+              setSelectedChapterForLiveClass(null);
+            }}
+          />
+        )}
+
+        {/* Notification Center Modal */}
+        {showNotificationCenter && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
+              <div className="bg-white rounded-lg shadow-xl">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h2 className="text-xl font-semibold text-gray-900">Notifications</h2>
+                  <button
+                    onClick={() => setShowNotificationCenter(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                <div className="max-h-[80vh] overflow-y-auto">
+                  <NotificationCenter 
+                    courseId={id} 
+                    courseName={course?.title}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Video Upload Modal */}

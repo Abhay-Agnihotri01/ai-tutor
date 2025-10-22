@@ -48,11 +48,7 @@ const QuizTaker = ({ quiz, onComplete }) => {
 
     setIsSubmitting(true);
     try {
-      console.log('🔥 GOD LEVEL DEBUG - Submitting quiz:', {
-        quizId: quiz.id,
-        answers: answers,
-        questionsCount: quiz.questions.length
-      });
+
 
       const response = await fetch(`http://localhost:5000/api/quiz/${quiz.id}/attempts`, {
         method: 'POST',
@@ -67,7 +63,6 @@ const QuizTaker = ({ quiz, onComplete }) => {
       });
 
       const data = await response.json();
-      console.log('✅ Quiz submission response:', data);
       
       if (data.success) {
         toast.success('Quiz submitted successfully!');
@@ -81,7 +76,6 @@ const QuizTaker = ({ quiz, onComplete }) => {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('💥 GOD LEVEL DEBUG - Submit quiz error:', error);
       toast.error(error.message || 'Failed to submit quiz');
     } finally {
       setIsSubmitting(false);
@@ -126,7 +120,7 @@ const QuizTaker = ({ quiz, onComplete }) => {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('Submit assignment error:', error);
+
       toast.error(error.message || 'Failed to submit assignment');
     } finally {
       setIsSubmitting(false);
@@ -198,15 +192,9 @@ const QuizTaker = ({ quiz, onComplete }) => {
     );
   }
 
-  // GOD LEVEL DEBUG - Safety checks
-  console.log('🔥 GOD LEVEL DEBUG - QuizTaker received quiz:', quiz);
-  console.log('🔍 Quiz exists:', !!quiz);
-  console.log('🔍 Quiz questions exists:', !!quiz?.questions);
-  console.log('🔍 Quiz questions length:', quiz?.questions?.length || 0);
-  console.log('🔍 Quiz questions array:', quiz?.questions);
+
   
   if (!quiz) {
-    console.log('❌ Quiz is null/undefined');
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="theme-card rounded-lg p-6 text-center">
@@ -219,7 +207,6 @@ const QuizTaker = ({ quiz, onComplete }) => {
   }
   
   if (!quiz.questions) {
-    console.log('❌ Quiz questions property is missing');
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="theme-card rounded-lg p-6 text-center">
@@ -232,7 +219,6 @@ const QuizTaker = ({ quiz, onComplete }) => {
   }
   
   if (quiz.questions.length === 0) {
-    console.log('❌ Quiz has no questions (empty array)');
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="theme-card rounded-lg p-6 text-center">
@@ -247,13 +233,10 @@ const QuizTaker = ({ quiz, onComplete }) => {
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
   
-  console.log('📝 Current question index:', currentQuestionIndex);
-  console.log('📝 Current question:', currentQuestion);
-  console.log('📊 Progress:', progress);
+
 
   // Additional safety check for current question
   if (!currentQuestion) {
-    console.log('❌ Current question is null/undefined at index:', currentQuestionIndex);
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="theme-card rounded-lg p-6 text-center">
@@ -265,8 +248,7 @@ const QuizTaker = ({ quiz, onComplete }) => {
     );
   }
   
-  console.log('✅ Quiz is valid, rendering quiz interface');
-  console.log('🎉 Quiz has', quiz.questions.length, 'questions');
+
 
   return (
     <div className="max-w-4xl mx-auto p-6">

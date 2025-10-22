@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from 'lucide-react';
 
-const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '' }) => {
+const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, videoId, courseId, className = '' }) => {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -19,6 +19,7 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
   const controlsTimeoutRef = useRef(null);
   const previewVideoRef = useRef(null);
   const canvasRef = useRef(null);
+  const lastSavedTime = useRef(0);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -35,6 +36,15 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
       onTimeUpdate?.(video.currentTime);
+      
+      // Auto-save progress every 5 seconds (reduced frequency)
+      if (videoId && courseId && video.currentTime > 0 && Math.floor(video.currentTime) % 5 === 0) {
+        const currentSecond = Math.floor(video.currentTime);
+        if (currentSecond !== lastSavedTime.current) {
+          lastSavedTime.current = currentSecond;
+          saveVideoProgress(video.currentTime, video.duration);
+        }
+      }
     };
     const handlePlay = () => {
       setIsPlaying(true);
@@ -44,7 +54,14 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
     };
     const handleEnded = () => {
       setIsPlaying(false);
-      onEnded?.();
+      // Save final progress when video ends
+      if (videoId && courseId) {
+        saveVideoProgress(video.duration, video.duration);
+      }
+      // Small delay before auto-advance
+      setTimeout(() => {
+        onEnded?.();
+      }, 1000);
     };
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -139,6 +156,21 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
       }
     };
   }, [isPlaying]);
+
+  // Listen for jump to time events
+  useEffect(() => {
+    const handleJumpToTime = (event) => {
+      const { timestamp } = event.detail;
+      const video = videoRef.current;
+      if (video && timestamp !== undefined) {
+        video.currentTime = timestamp;
+        setShowControls(true);
+      }
+    };
+
+    window.addEventListener('jumpToTime', handleJumpToTime);
+    return () => window.removeEventListener('jumpToTime', handleJumpToTime);
+  }, []);
 
   // Volume control
   useEffect(() => {
@@ -268,6 +300,42 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
     setLastTap(now);
   };
 
+  const saveVideoProgress = async (watchTime, duration) => {
+    if (!videoId || !courseId) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const percentage = duration > 0 ? (watchTime / duration) * 100 : 0;
+      console.log(`Saving progress: ${percentage.toFixed(1)}% (${Math.floor(watchTime)}/${Math.floor(duration)}s)`);
+      
+      const response = await fetch('http://localhost:5000/api/enrollments/video-progress', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          videoId,
+          courseId,
+          watchTime: Math.floor(watchTime),
+          duration: Math.floor(duration)
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.completed) {
+          console.log('Video marked as completed!');
+          window.dispatchEvent(new CustomEvent('videoCompleted', { detail: { videoId } }));
+        }
+      }
+    } catch (error) {
+      // Silent fail
+    }
+  };
+
   const formatTime = (time) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
@@ -289,6 +357,9 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
         className="w-full h-full cursor-pointer"
         onClick={handleVideoClick}
         onContextMenu={(e) => e.preventDefault()}
+        preload="metadata"
+        playsInline
+        controlsList="nodownload"
       />
       
       {/* Hidden preview video and canvas for thumbnail generation */}
@@ -297,8 +368,8 @@ const EnhancedVideoPlayer = ({ src, poster, onTimeUpdate, onEnded, className = '
         src={src}
         className="hidden"
         muted
-        preload="metadata"
-        crossOrigin="anonymous"
+        preload="none"
+        playsInline
       />
       <canvas ref={canvasRef} className="hidden" />
 

@@ -55,7 +55,7 @@ export const getCourseChapters = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    // Get chapters with videos and resources
+    // Get chapters with videos, resources, and text lectures
     const { data: chapters, error } = await supabase
       .from('chapters')
       .select(`
@@ -70,13 +70,27 @@ export const getCourseChapters = async (req, res) => {
       .eq('courseId', courseId)
       .order('order', { ascending: true });
 
+    // Get text lectures separately and add to chapters
+    let textLectures = [];
+    try {
+      const { data: textLectureData } = await supabase
+        .from('text_lectures')
+        .select('*')
+        .eq('courseId', courseId)
+        .order('order', { ascending: true });
+      textLectures = textLectureData || [];
+    } catch (error) {
+      // text_lectures table might not exist yet
+    }
+
     if (error) throw error;
 
-    // Sort videos and resources by order
+    // Sort videos, resources, and add text lectures by order
     const chaptersWithSortedContent = chapters.map(chapter => ({
       ...chapter,
       videos: (chapter.videos || []).sort((a, b) => (a.order || 0) - (b.order || 0)),
-      resources: (chapter.resources || []).sort((a, b) => (a.order || 0) - (b.order || 0))
+      resources: (chapter.resources || []).sort((a, b) => (a.order || 0) - (b.order || 0)),
+      text_lectures: textLectures.filter(tl => tl.chapterId === chapter.id).sort((a, b) => (a.order || 0) - (b.order || 0))
     }));
 
     res.json({

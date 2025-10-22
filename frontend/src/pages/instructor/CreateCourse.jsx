@@ -73,7 +73,7 @@ const CreateCourse = () => {
       
       if (result.success) {
         toast.success('Course created successfully!');
-        navigate('/instructor');
+        navigate('/instructor/dashboard');
       } else {
         throw new Error(result.message || 'Failed to create course');
       }
@@ -91,7 +91,7 @@ const CreateCourse = () => {
         {/* Header */}
         <div className="flex items-center mb-8">
           <button
-            onClick={() => navigate('/instructor')}
+            onClick={() => navigate('/instructor/dashboard')}
             className="mr-4 p-2 hover:theme-bg-secondary rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 theme-text-primary" />
@@ -245,7 +245,7 @@ const CreateCourse = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/instructor')}
+              onClick={() => navigate('/instructor/dashboard')}
             >
               Cancel
             </Button>

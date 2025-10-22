@@ -102,7 +102,7 @@ const InstructorCourses = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
-            <Link to="/instructor" className="mr-4 p-2 hover:theme-bg-secondary rounded-lg transition-colors">
+            <Link to="/instructor/dashboard" className="mr-4 p-2 hover:theme-bg-secondary rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5 theme-text-primary" />
             </Link>
             <div>

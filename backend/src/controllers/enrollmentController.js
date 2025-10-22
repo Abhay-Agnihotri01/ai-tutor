@@ -169,20 +169,138 @@ export const markVideoComplete = async (req, res) => {
   }
 };
 
+export const updateVideoProgress = async (req, res) => {
+  try {
+    const { videoId, courseId, watchTime, duration } = req.body;
+    const userId = req.user.id;
+
+    if (!videoId || !courseId || watchTime === undefined || duration === undefined) {
+      return res.status(400).json({ success: false, message: 'Missing fields' });
+    }
+
+    const watchPercentage = duration > 0 ? (watchTime / duration) * 100 : 0;
+    const shouldMarkComplete = watchPercentage >= 85;
+
+    // Check if already completed
+    const { data: existing } = await supabase
+      .from('video_progress')
+      .select('completed')
+      .eq('"userId"', userId)
+      .eq('"videoId"', videoId)
+      .single();
+
+    // Only mark as complete if not already completed or if reaching 85%
+    const isCompleted = existing?.completed || shouldMarkComplete;
+
+    // Upsert video progress
+    const { error: upsertError } = await supabase
+      .from('video_progress')
+      .upsert({
+        "userId": userId,
+        "videoId": videoId,
+        "courseId": courseId,
+        completed: isCompleted,
+        "completedAt": isCompleted && !existing?.completed ? new Date().toISOString() : undefined
+      }, { onConflict: '"userId","videoId"' });
+      
+
+
+    // Update course progress if video completed
+    if (isCompleted) {
+      const { data: chapters } = await supabase
+        .from('chapters')
+        .select('id')
+        .eq('courseId', courseId);
+      
+      const chapterIds = chapters?.map(ch => ch.id) || [];
+      
+      const { data: courseVideos } = await supabase
+        .from('videos')
+        .select('id')
+        .in('chapterId', chapterIds);
+
+      const { data: completedVideos } = await supabase
+        .from('video_progress')
+        .select('videoId')
+        .eq('userId', userId)
+        .eq('courseId', courseId)
+        .eq('completed', true);
+
+      const totalVideos = courseVideos?.length || 1;
+      const completedCount = completedVideos?.length || 0;
+      const courseProgress = Math.round((completedCount / totalVideos) * 100);
+
+      await supabase
+        .from('enrollments')
+        .update({ progress: courseProgress })
+        .eq('userId', userId)
+        .eq('courseId', courseId);
+    }
+
+    res.json({ success: true, completed: isCompleted });
+  } catch (error) {
+    res.json({ success: true, message: 'Progress not saved' });
+  }
+};
+
 export const getVideoProgress = async (req, res) => {
   try {
     const { courseId } = req.params;
     const userId = req.user.id;
 
-    const { data: progress } = await supabase
+    // Get video progress
+    const { data: videoProgress } = await supabase
       .from('video_progress')
-      .select('videoId, completed')
-      .eq('userId', userId)
-      .eq('courseId', courseId);
+      .select('"videoId", completed')
+      .eq('"userId"', userId)
+      .eq('"courseId"', courseId);
 
-    res.json({ success: true, progress: progress || [] });
+    // Get text lecture progress
+    const { data: textLectureProgress } = await supabase
+      .from('text_lecture_progress')
+      .select('"textLectureId", completed')
+      .eq('"userId"', userId)
+      .eq('"courseId"', courseId);
+
+    // Combine both progress types
+    const allProgress = [
+      ...(videoProgress || []).map(p => ({ videoId: p.videoId, completed: p.completed })),
+      ...(textLectureProgress || []).map(p => ({ videoId: p.textLectureId, completed: p.completed }))
+    ];
+
+    res.json({ success: true, progress: allProgress });
   } catch (error) {
-    console.error('Get video progress error:', error);
+    res.json({ success: true, progress: [] });
+  }
+};
+
+export const markContentComplete = async (req, res) => {
+  try {
+    const { courseId, contentId, contentType } = req.body;
+    const userId = req.user.id;
+
+    if (contentType === 'text_lecture') {
+      // Create a separate table for text lecture progress or use a generic content_progress table
+      // For now, let's create a simple approach using a separate table
+      const { error } = await supabase
+        .from('text_lecture_progress')
+        .upsert({
+          userId,
+          textLectureId: contentId,
+          courseId,
+          completed: true,
+          completedAt: new Date().toISOString()
+        }, { onConflict: '"userId","textLectureId"' });
+      
+      if (error) {
+        console.error('Text lecture progress error:', error);
+        return res.status(500).json({ message: 'Failed to save progress', error: error.message });
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark content complete error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

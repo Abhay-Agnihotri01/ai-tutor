@@ -60,6 +60,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
+    window.location.href = '/';
   };
 
   const clearInvalidToken = () => {

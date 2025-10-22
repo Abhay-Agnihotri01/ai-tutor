@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -24,6 +24,9 @@ import InstructorCourses from './pages/instructor/InstructorCourses';
 import RevenueAnalytics from './pages/instructor/RevenueAnalytics';
 import AssignmentSubmissions from './pages/instructor/AssignmentSubmissions';
 import CourseReviews from './pages/instructor/CourseReviews';
+import CreateTextLecture from './components/instructor/CreateTextLecture';
+import GradeSubmission from './pages/instructor/GradeSubmission';
+import JitsiLiveClassRoom from './components/live/JitsiLiveClassRoom';
 import axios from 'axios';
 
 // Configure axios defaults
@@ -78,6 +81,7 @@ const AppContent = () => {
             <Route path="/auth/role-selection" element={<RoleSelection />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/my-learning" element={<MyLearning />} />
+            <Route path="/instructor" element={<Navigate to="/instructor/dashboard" replace />} />
             <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
             <Route path="/instructor/courses" element={<InstructorCourses />} />
             <Route path="/instructor/analytics" element={<RevenueAnalytics />} />
@@ -86,6 +90,10 @@ const AppContent = () => {
             <Route path="/instructor/course/:id/builder" element={<CourseBuilder />} />
             <Route path="/instructor/submissions/:quizId" element={<AssignmentSubmissions />} />
             <Route path="/instructor/course/:courseId/reviews" element={<CourseReviews />} />
+            <Route path="/instructor/text-lecture/create" element={<CreateTextLecture />} />
+            <Route path="/instructor/grade/:submissionId" element={<GradeSubmission />} />
+            <Route path="/instructor/live-class/:meetingId" element={<JitsiLiveClassRoom />} />
+        <Route path="/student/live-class/:meetingId" element={<JitsiLiveClassRoom />} />
             <Route path="*" element={<div className="p-8 text-center theme-text-primary">404 - Page Not Found</div>} />
           </Routes>
         </main>

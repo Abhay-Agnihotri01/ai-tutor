@@ -57,13 +57,7 @@ export const addQuizQuestion = async (req, res) => {
     const { quizId } = req.params;
     const { question, type, marks, options, correctAnswer } = req.body;
     
-    console.log('🔥 GOD LEVEL DEBUG - Adding question to quiz:');
-    console.log('📝 Quiz ID:', quizId);
-    console.log('📝 Question:', question);
-    console.log('📝 Type:', type);
-    console.log('📝 Marks:', marks);
-    console.log('📝 Options:', options);
-    console.log('📝 Correct Answer:', correctAnswer);
+
     
     // Check if quiz exists first
     const { data: existingQuiz, error: quizCheckError } = await supabase
@@ -72,21 +66,16 @@ export const addQuizQuestion = async (req, res) => {
       .eq('id', quizId)
       .single();
     
-    console.log('🔍 Quiz exists check:', { existingQuiz, quizCheckError });
-    
     if (quizCheckError || !existingQuiz) {
-      console.log('❌ Quiz not found!');
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    console.log('💾 Inserting question into database...');
     const questionInsertData = {
       "quizId": quizId,
       "questionText": question,
       "questionType": type || 'single_correct',
       points: marks || 1
     };
-    console.log('📊 Question insert data:', questionInsertData);
     
     const { data: questionData, error: questionError } = await supabase
       .from('quiz_questions')
@@ -94,15 +83,12 @@ export const addQuizQuestion = async (req, res) => {
       .select()
       .single();
 
-    console.log('✅ Question insert result:', { questionData, questionError });
     if (questionError) {
-      console.log('❌ Question insert failed:', questionError);
       throw questionError;
     }
 
     // Add options for multiple choice questions
     if (options && options.length > 0) {
-      console.log('🎯 Adding options for question...');
       const optionsData = options.map((option, index) => {
         let isCorrect = false;
         
@@ -112,34 +98,26 @@ export const addQuizQuestion = async (req, res) => {
           isCorrect = Array.isArray(correctAnswer) && correctAnswer.includes(option);
         }
         
-        const optionData = {
+        return {
           "questionId": questionData.id,
           "optionText": option,
           "isCorrect": isCorrect,
           "orderIndex": index
         };
-        
-        console.log(`📋 Option ${index + 1}:`, optionData);
-        return optionData;
       });
 
-      console.log('💾 Inserting options into database...');
       const { data: insertedOptions, error: optionsError } = await supabase
         .from('quiz_options')
         .insert(optionsData)
         .select();
 
-      console.log('✅ Options insert result:', { insertedOptions, optionsError });
       if (optionsError) {
-        console.log('❌ Options insert failed:', optionsError);
         throw optionsError;
       }
     }
 
     // Update quiz totalMarks
-    console.log('🔢 Updating quiz total marks...');
     const newTotalMarks = (existingQuiz?.totalMarks || 0) + (marks || 1);
-    console.log('📊 New total marks:', newTotalMarks);
     
     const { data: updatedQuiz, error: updateError } = await supabase
       .from('quizzes')
@@ -148,16 +126,12 @@ export const addQuizQuestion = async (req, res) => {
       .select()
       .single();
     
-    console.log('✅ Quiz update result:', { updatedQuiz, updateError });
     if (updateError) {
-      console.log('❌ Quiz update failed:', updateError);
+      // Quiz update failed but question was added
     }
-
-    console.log('🎉 Question added successfully!');
     res.status(201).json({ success: true, question: questionData });
   } catch (error) {
-    console.error('💥 GOD LEVEL DEBUG - Add quiz question error:', error);
-    console.error('💥 Error stack:', error.stack);
+    console.error('Add quiz question error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -166,8 +140,6 @@ export const addQuizQuestion = async (req, res) => {
 export const getQuiz = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('🔥 GOD LEVEL DEBUG - Getting quiz with ID:', id);
-
     // First check if quiz exists
     const { data: basicQuiz, error: basicError } = await supabase
       .from('quizzes')
@@ -175,29 +147,9 @@ export const getQuiz = async (req, res) => {
       .eq('id', id)
       .single();
     
-    console.log('🔍 Basic quiz check:', { basicQuiz, basicError });
-    
     if (basicError || !basicQuiz) {
-      console.log('❌ Quiz not found in database!');
       return res.status(404).json({ message: 'Quiz not found' });
     }
-    
-    console.log('📊 Quiz basic info:', {
-      id: basicQuiz.id,
-      title: basicQuiz.title,
-      type: basicQuiz.type,
-      totalMarks: basicQuiz.totalMarks,
-      isActive: basicQuiz.isActive
-    });
-
-    // Check if quiz_questions table exists and has data
-    const { data: questionCheck, error: questionCheckError } = await supabase
-      .from('quiz_questions')
-      .select('id, "questionText"')
-      .eq('"quizId"', id)
-      .limit(1);
-    
-    console.log('🔍 Question table check:', { questionCheck, questionCheckError });
     
     // Get full quiz with questions
     const { data: quiz, error: quizError } = await supabase
@@ -221,38 +173,14 @@ export const getQuiz = async (req, res) => {
       .single();
 
     if (quizError) {
-      console.error('❌ Quiz with questions query error:', quizError);
       throw quizError;
     }
 
-    console.log('📊 Raw quiz data structure:');
-    console.log('- Quiz ID:', quiz.id);
-    console.log('- Quiz Title:', quiz.title);
-    console.log('- Quiz Type:', quiz.type);
-    console.log('- Total Marks:', quiz.totalMarks);
-    console.log('- Is Active:', quiz.isActive);
-    console.log('- Raw Questions Array:', quiz.quiz_questions);
-    console.log('- Questions Count:', quiz.quiz_questions?.length || 0);
-    
-    if (quiz.quiz_questions && quiz.quiz_questions.length > 0) {
-      console.log('📝 First question details:');
-      const firstQ = quiz.quiz_questions[0];
-      console.log('  - ID:', firstQ.id);
-      console.log('  - Text:', firstQ.questionText);
-      console.log('  - Type:', firstQ.questionType);
-      console.log('  - Points:', firstQ.points);
-      console.log('  - Options:', firstQ.quiz_options);
-    }
+
 
     // Transform questions to match frontend expectations
     const transformedQuestions = (quiz.quiz_questions || []).map((q, index) => {
-      console.log(`🔄 Transforming question ${index + 1}:`, {
-        id: q.id,
-        questionText: q.questionText,
-        questionType: q.questionType,
-        points: q.points,
-        optionsCount: q.quiz_options?.length || 0
-      });
+
       
       return {
         id: q.id,
@@ -277,19 +205,11 @@ export const getQuiz = async (req, res) => {
     // Remove the raw quiz_questions to avoid confusion
     delete finalQuiz.quiz_questions;
     
-    console.log('✅ Final quiz object structure:');
-    console.log('  - ID:', finalQuiz.id);
-    console.log('  - Title:', finalQuiz.title);
-    console.log('  - Questions property exists:', 'questions' in finalQuiz);
-    console.log('  - Questions count:', finalQuiz.questions.length);
-    console.log('  - Questions array:', finalQuiz.questions);
-    
-    console.log('🎉 Sending quiz with', transformedQuestions.length, 'questions to frontend');
+
 
     res.json({ success: true, quiz: finalQuiz });
   } catch (error) {
-    console.error('💥 GOD LEVEL DEBUG - Get quiz error:', error);
-    console.error('💥 Error stack:', error.stack);
+    console.error('Get quiz error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -333,72 +253,43 @@ export const submitQuizAttempt = async (req, res) => {
     let score = 0;
     let totalPoints = 0;
     
-    console.log('🔥 GOD LEVEL DEBUG - Calculating quiz score:');
-    console.log('📊 User answers:', answers);
-    console.log('📊 Questions count:', quiz.quiz_questions.length);
+
 
     quiz.quiz_questions.forEach((question, index) => {
       totalPoints += question.points;
       const userAnswer = answers[question.id];
       
-      console.log(`📝 Question ${index + 1}:`, {
-        id: question.id,
-        text: question.questionText,
-        type: question.questionType,
-        points: question.points,
-        userAnswer: userAnswer,
-        options: question.quiz_options
-      });
+
       
       if (question.questionType === 'single_correct') {
         const correctOptions = question.quiz_options.filter(opt => opt.isCorrect);
         const correctOption = correctOptions[0];
         
-        console.log('  - Correct option:', correctOption);
-        console.log('  - User selected option text:', userAnswer);
-        
         // Compare by option text, not ID
         if (correctOption && userAnswer === correctOption.optionText) {
           score += question.points;
-          console.log('  ✅ CORRECT! +', question.points, 'points');
-        } else {
-          console.log('  ❌ WRONG');
         }
       } else if (question.questionType === 'multiple_correct') {
         const userAnswers = Array.isArray(userAnswer) ? userAnswer : [];
         const correctOptions = question.quiz_options.filter(opt => opt.isCorrect);
         const correctTexts = correctOptions.map(opt => opt.optionText);
         
-        console.log('  - Correct options:', correctTexts);
-        console.log('  - User selected:', userAnswers);
-        
         if (correctTexts.length === userAnswers.length && 
             correctTexts.every(text => userAnswers.includes(text))) {
           score += question.points;
-          console.log('  ✅ CORRECT! +', question.points, 'points');
-        } else {
-          console.log('  ❌ WRONG');
         }
       } else if (question.questionType === 'true_false') {
-        console.log('  - User answer:', userAnswer);
         if (userAnswer === 'true' || userAnswer === 'false') {
           // For true/false, check against correct options
           const correctOption = question.quiz_options.find(opt => opt.isCorrect);
           if (correctOption && userAnswer === correctOption.optionText) {
             score += question.points;
-            console.log('  ✅ CORRECT! +', question.points, 'points');
-          } else {
-            console.log('  ❌ WRONG');
           }
         }
       }
     });
     
-    console.log('🎆 Final score calculation:', {
-      score: score,
-      totalPoints: totalPoints,
-      percentage: totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0
-    });
+
 
     const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
     const isPassed = percentage >= quiz.passingMarks;
@@ -439,8 +330,6 @@ export const submitQuizAttempt = async (req, res) => {
 export const getQuizzesByChapter = async (req, res) => {
   try {
     const { chapterId } = req.params;
-    console.log('🔥 GOD LEVEL DEBUG - Getting quizzes for chapter:', chapterId);
-
     const { data: quizzes, error } = await supabase
       .from('quizzes')
       .select('*')
@@ -448,19 +337,13 @@ export const getQuizzesByChapter = async (req, res) => {
       .order('"createdAt"', { ascending: false });
 
     if (error) {
-      console.log('❌ Error getting quizzes:', error);
       throw error;
     }
-    
-    console.log('📊 Found', quizzes?.length || 0, 'quizzes for chapter');
 
     // Get question counts and questions for quizzes
     const quizzesWithStatus = [];
     for (const quiz of quizzes || []) {
-      console.log(`🔍 Checking quiz: ${quiz.title} (${quiz.id})`);
-      console.log('  - Type:', quiz.type);
-      console.log('  - Is Active:', quiz.isActive);
-      console.log('  - Total Marks:', quiz.totalMarks);
+
       
       let isReady = quiz.isActive;
       let questionCount = 0;
@@ -501,13 +384,12 @@ export const getQuizzesByChapter = async (req, res) => {
           }));
         }
         
-        console.log('  - Question Count:', questionCount);
-        console.log('  - Questions Error:', questionsError);
+
         
         isReady = isReady && questionCount > 0;
       }
       
-      console.log('  - Final isReady:', isReady);
+
       
       // Calculate total marks from questions if it's a quiz type
       let actualTotalMarks = quiz.totalMarks;
@@ -532,18 +414,11 @@ export const getQuizzesByChapter = async (req, res) => {
       });
     }
     
-    console.log('✅ Final quizzes with status:', quizzesWithStatus.map(q => ({
-      id: q.id,
-      title: q.title,
-      type: q.type,
-      isReady: q.isReady,
-      questionCount: q.questionCount,
-      questionsLength: q.questions?.length || 0
-    })));
+
 
     res.json({ success: true, quizzes: quizzesWithStatus });
   } catch (error) {
-    console.error('💥 GOD LEVEL DEBUG - Get quizzes by chapter error:', error);
+    console.error('Get quizzes by chapter error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -603,7 +478,7 @@ export const startQuizAttempt = async (req, res) => {
     const { quizId } = req.body;
     const userId = req.user.id;
     
-    console.log('🔥 GOD LEVEL DEBUG - Starting quiz attempt for quiz:', quizId);
+
 
     // Get quiz with questions using the same logic as getQuiz
     const { data: quiz, error: quizError } = await supabase
@@ -627,19 +502,13 @@ export const startQuizAttempt = async (req, res) => {
       .single();
 
     if (quizError) {
-      console.log('❌ Quiz query error:', quizError);
       throw quizError;
     }
     if (!quiz) {
-      console.log('❌ Quiz not found');
       return res.status(404).json({ message: 'Quiz not found' });
     }
     
-    console.log('📊 Raw quiz data for attempt:', {
-      id: quiz.id,
-      title: quiz.title,
-      questionsCount: quiz.quiz_questions?.length || 0
-    });
+
 
     // Transform questions to match frontend expectations (same as getQuiz)
     const transformedQuestions = (quiz.quiz_questions || []).map(q => ({
@@ -664,12 +533,7 @@ export const startQuizAttempt = async (req, res) => {
     // Remove the raw quiz_questions to avoid confusion
     delete finalQuiz.quiz_questions;
     
-    console.log('✅ Transformed quiz for attempt:', {
-      id: finalQuiz.id,
-      title: finalQuiz.title,
-      hasQuestionsProperty: 'questions' in finalQuiz,
-      questionsCount: finalQuiz.questions.length
-    });
+
 
     // Create attempt record
     const { data: attempt, error: attemptError } = await supabase
@@ -683,11 +547,8 @@ export const startQuizAttempt = async (req, res) => {
       .single();
 
     if (attemptError) {
-      console.log('❌ Attempt creation error:', attemptError);
       throw attemptError;
     }
-    
-    console.log('🎉 Quiz attempt started successfully');
 
     res.json({
       success: true,
@@ -697,7 +558,7 @@ export const startQuizAttempt = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('💥 GOD LEVEL DEBUG - Start quiz attempt error:', error);
+    console.error('Start quiz attempt error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -815,9 +676,7 @@ export const getQuizDetails = async (req, res) => {
     // Remove the raw quiz_questions to avoid confusion
     delete finalQuiz.quiz_questions;
     
-    console.log('✅ Quiz details - Final quiz object:');
-    console.log('  - Questions property exists:', 'questions' in finalQuiz);
-    console.log('  - Questions count:', finalQuiz.questions.length);
+
 
     res.json({ success: true, quiz: finalQuiz });
   } catch (error) {

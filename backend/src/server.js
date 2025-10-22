@@ -6,7 +6,10 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import { createServer } from 'http';
 import supabase from './config/supabase.js';
+import socketService from './services/socketService.js';
+import liveClassSocketService from './services/liveClassSocketService.js';
 import authRoutes from './routes/authRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
 import enrollmentRoutes from './routes/enrollmentRoutes.js';
@@ -20,13 +23,50 @@ import quizRoutes from './routes/quizRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import qaRoutes from './routes/qaRoutes.js';
 import certificateRoutes from './routes/certificateRoutes.js';
+import notesRoutes from './routes/notesRoutes.js';
+import textLectureRoutes from './routes/textLectureRoutes.js';
+import textLectureNotesRoutes from './routes/textLectureNotesRoutes.js';
+import liveClassRoutes from './routes/liveClassRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 import passport from './config/passport.js';
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Test endpoints - MUST be first, before any middleware
+app.get('/test-simple', (req, res) => {
+  res.json({ message: 'Test endpoint working', timestamp: new Date().toISOString() });
+});
+
+app.post('/test-note-creation', async (req, res) => {
+  try {
+    const { data: note, error } = await supabase
+      .from('text_lecture_notes')
+      .insert([{
+        textLectureId: 1,
+        courseId: 1,
+        userId: 1,
+        content: 'Test note content',
+        type: 'text',
+        createdAt: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Test note creation error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, note });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Security middleware
 app.use(helmet({
@@ -78,6 +118,70 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
 
 // Passport middleware
 app.use(passport.initialize());
+
+// Test endpoints (before auth middleware)
+app.get('/api/test-text-lecture-notes', async (req, res) => {
+  try {
+    // Try to insert a test record to see the actual column types
+    const { data, error } = await supabase
+      .from('text_lecture_notes')
+      .insert([{
+        textLectureId: '550e8400-e29b-41d4-a716-446655440000',
+        courseId: '550e8400-e29b-41d4-a716-446655440001', 
+        userId: '550e8400-e29b-41d4-a716-446655440002',
+        content: 'Test content',
+        type: 'text'
+      }])
+      .select()
+      .single();
+    
+    if (error) {
+      return res.json({ 
+        success: false,
+        error: error.message,
+        code: error.code,
+        details: error.details
+      });
+    }
+    
+    // Delete the test record
+    await supabase.from('text_lecture_notes').delete().eq('id', data.id);
+    
+    res.json({ 
+      success: true, 
+      message: 'Table has correct UUID columns',
+      testData: data
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/test-create-text-note', async (req, res) => {
+  try {
+    const { data: note, error } = await supabase
+      .from('text_lecture_notes')
+      .insert([{
+        textLectureId: 1,
+        courseId: 1,
+        userId: 1,
+        content: 'Test note content',
+        type: 'text',
+        createdAt: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Test note creation error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, note });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Debug endpoints (before auth middleware)
 app.get('/api/debug/question-table', async (req, res) => {
@@ -151,6 +255,17 @@ app.get('/api/debug/test-question-model', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+// Test notification endpoint (no auth required)
+app.get('/api/notifications/test', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Notification system is working',
+    timestamp: new Date().toISOString() 
+  });
+});
+
+
 
 // Test creating a question manually
 app.post('/api/debug/create-test-question/:quizId', async (req, res) => {
@@ -578,6 +693,86 @@ app.post('/api/debug/test-resource-upload', (req, res) => {
   });
 });
 
+// Check video progress table structure
+app.get('/api/debug/video-progress-structure', async (req, res) => {
+  try {
+    // Try to select all columns to see what exists
+    const { data: progressData, error } = await supabase
+      .from('video_progress')
+      .select('*')
+      .limit(1);
+    
+    res.json({
+      success: !error,
+      columns: progressData?.[0] ? Object.keys(progressData[0]) : [],
+      sampleData: progressData?.[0] || null,
+      error: error?.message
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create live class tables (debug endpoint)
+app.get('/api/debug/create-live-class-tables', async (req, res) => {
+  try {
+    // Create live_classes table
+    const { error: error1 } = await supabase
+      .from('live_classes')
+      .select('id')
+      .limit(1);
+    
+    if (error1 && error1.code === 'PGRST116') {
+      // Table doesn't exist, create it using raw SQL
+      const createTablesSQL = `
+        CREATE TABLE IF NOT EXISTS live_classes (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          "courseId" UUID NOT NULL,
+          "chapterId" UUID,
+          "instructorId" UUID NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          "scheduledAt" TIMESTAMPTZ NOT NULL,
+          duration INTEGER NOT NULL DEFAULT 60,
+          "meetingUrl" VARCHAR(500),
+          "meetingId" VARCHAR(100),
+          status VARCHAR(20) DEFAULT 'scheduled',
+          "maxParticipants" INTEGER DEFAULT 100,
+          "isRecorded" BOOLEAN DEFAULT false,
+          "recordingUrl" VARCHAR(500),
+          "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+          "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS live_class_participants (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          "liveClassId" UUID NOT NULL,
+          "userId" UUID NOT NULL,
+          "joinedAt" TIMESTAMPTZ,
+          "leftAt" TIMESTAMPTZ,
+          "isPresent" BOOLEAN DEFAULT false,
+          "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE("liveClassId", "userId")
+        );
+      `;
+      
+      res.json({
+        success: false,
+        message: 'Tables need to be created manually in Supabase',
+        sql: createTablesSQL,
+        instructions: 'Copy the SQL above and run it in your Supabase SQL Editor'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'Live class tables already exist'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug assignment issue (public endpoint)
 app.get('/api/debug/assignment/:quizId', async (req, res) => {
   try {
@@ -677,6 +872,12 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/qa', qaRoutes);
 app.use('/api/certificates', certificateRoutes);
+app.use('/api/notes', notesRoutes);
+app.use('/api/notes', textLectureNotesRoutes);
+app.use('/api', textLectureNotesRoutes);
+app.use('/api/text-lectures', textLectureRoutes);
+app.use('/api/live-classes', liveClassRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api', chapterRoutes);
 
 // Debug enrollments
@@ -775,8 +976,24 @@ const startServer = async () => {
     }
     console.log('Supabase connected successfully');
     
-    app.listen(PORT, () => {
+    // Check and create live class tables if they don't exist
+    try {
+      const { error: checkError } = await supabase.from('live_classes').select('id').limit(1);
+      if (checkError && checkError.code === 'PGRST116') {
+        console.log('Live class tables not found. Please create them manually in Supabase:');
+        console.log('Visit: http://localhost:5000/api/debug/create-live-class-tables for SQL');
+      }
+    } catch (tableError) {
+      // Ignore table check errors
+    }
+    
+    // Initialize Socket.IO services
+    liveClassSocketService.initialize(server);
+    
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
+      console.log('Server accessible on all network interfaces');
+      console.log('Socket.IO initialized for live classes');
       console.log('Note: Make sure to run the database migration script to create tables');
     });
   } catch (error) {

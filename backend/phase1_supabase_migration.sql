@@ -75,7 +75,41 @@ CREATE TABLE IF NOT EXISTS question_answers (
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
 
--- 4. Certificates System
+-- 4. Video Progress Tracking System
+CREATE TABLE IF NOT EXISTS video_progress (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "videoId" UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  "courseId" UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  completed BOOLEAN DEFAULT false,
+  "completedAt" TIMESTAMP,
+  "watchTime" INTEGER DEFAULT 0,
+  "watchPercentage" DECIMAL(5,2) DEFAULT 0,
+  "lastWatchedAt" TIMESTAMP,
+  "createdAt" TIMESTAMP DEFAULT NOW(),
+  "updatedAt" TIMESTAMP DEFAULT NOW(),
+  UNIQUE("userId", "videoId")
+);
+
+-- Add video progress columns to enrollments
+ALTER TABLE enrollments 
+ADD COLUMN IF NOT EXISTS "lastWatchedVideoId" UUID REFERENCES videos(id),
+ADD COLUMN IF NOT EXISTS "lastWatchedAt" TIMESTAMP;
+
+-- 5. Student Notes System
+CREATE TABLE IF NOT EXISTS student_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "videoId" UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  "courseId" UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  type VARCHAR(20) DEFAULT 'text',
+  content TEXT NOT NULL,
+  timestamp INTEGER DEFAULT 0,
+  "createdAt" TIMESTAMP DEFAULT NOW(),
+  "updatedAt" TIMESTAMP DEFAULT NOW()
+);
+
+-- 6. Certificates System
 CREATE TABLE IF NOT EXISTS certificates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "courseId" UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -94,4 +128,8 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_quiz ON quiz_attempts("userId"
 CREATE INDEX IF NOT EXISTS idx_course_reviews_course_id ON course_reviews("courseId");
 CREATE INDEX IF NOT EXISTS idx_course_questions_course_id ON course_questions("courseId");
 CREATE INDEX IF NOT EXISTS idx_question_answers_question_id ON question_answers("questionId");
+CREATE INDEX IF NOT EXISTS idx_video_progress_user_course ON video_progress("userId", "courseId");
+CREATE INDEX IF NOT EXISTS idx_video_progress_video ON video_progress("videoId");
+CREATE INDEX IF NOT EXISTS idx_student_notes_user_video ON student_notes("userId", "videoId");
+CREATE INDEX IF NOT EXISTS idx_student_notes_course ON student_notes("courseId");
 CREATE INDEX IF NOT EXISTS idx_certificates_user_course ON certificates("userId", "courseId");

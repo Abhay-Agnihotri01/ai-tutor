@@ -9,6 +9,7 @@ import Quiz from './Quiz.js';
 import Question from './Question.js';
 import QuizAttempt from './QuizAttempt.js';
 import QuestionResponse from './QuestionResponse.js';
+import TextLecture from './TextLecture.js';
 
 // Define associations
 User.hasMany(Course, { foreignKey: 'instructorId', as: 'courses' });
@@ -58,4 +59,11 @@ QuestionResponse.belongsTo(QuizAttempt, { foreignKey: 'attemptId', as: 'attempt'
 Question.hasMany(QuestionResponse, { foreignKey: 'questionId', as: 'responses' });
 QuestionResponse.belongsTo(Question, { foreignKey: 'questionId', as: 'question' });
 
-export { User, Course, Enrollment, Chapter, Video, Rating, Resource, Quiz, Question, QuizAttempt, QuestionResponse };
+// TextLecture associations
+Chapter.hasMany(TextLecture, { foreignKey: 'chapterId', as: 'textLectures' });
+TextLecture.belongsTo(Chapter, { foreignKey: 'chapterId', as: 'chapter' });
+
+Course.hasMany(TextLecture, { foreignKey: 'courseId', as: 'textLectures' });
+TextLecture.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
+
+export { User, Course, Enrollment, Chapter, Video, Rating, Resource, Quiz, Question, QuizAttempt, QuestionResponse, TextLecture };

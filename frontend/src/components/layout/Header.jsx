@@ -11,22 +11,26 @@ const Header = () => {
   const { isDark, toggleTheme } = useTheme();
   const { user, logout, isAuthenticated } = useAuth();
   const profileRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setIsProfileOpen(false);
       }
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
     };
 
-    if (isProfileOpen) {
+    if (isProfileOpen || isMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isProfileOpen]);
+  }, [isProfileOpen, isMenuOpen]);
 
   return (
     <header className="theme-card border-b theme-border animate-slide-in-left">
@@ -140,27 +144,38 @@ const Header = () => {
           </div>
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile menu overlay */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 border-t theme-border">
-            <nav className="flex flex-col space-y-3">
-              <Link to="/courses" className="theme-text-secondary hover:text-primary-600">
-                Courses
-              </Link>
-              <Link to="/about" className="theme-text-secondary hover:text-primary-600">
-                About
-              </Link>
-              {!isAuthenticated && (
-                <div className="flex flex-col space-y-2 pt-3 border-t theme-border">
-                  <Link to="/login">
-                    <Button variant="outline" className="w-full">Login</Button>
-                  </Link>
-                  <Link to="/register">
-                    <Button className="w-full">Sign Up</Button>
-                  </Link>
-                </div>
-              )}
-            </nav>
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="fixed inset-0" onClick={() => setIsMenuOpen(false)} />
+            <div ref={menuRef} className="absolute top-16 right-4 w-64 theme-card rounded-lg shadow-lg theme-border border animate-scale-in">
+              <nav className="flex flex-col p-4 space-y-3">
+                <Link 
+                  to="/courses" 
+                  className="theme-text-secondary hover:text-primary-600 py-2 px-2 rounded hover:theme-bg-secondary transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Courses
+                </Link>
+                <Link 
+                  to="/about" 
+                  className="theme-text-secondary hover:text-primary-600 py-2 px-2 rounded hover:theme-bg-secondary transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  About
+                </Link>
+                {!isAuthenticated && (
+                  <div className="flex flex-col space-y-2 pt-3 border-t theme-border">
+                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outline" className="w-full">Login</Button>
+                    </Link>
+                    <Link to="/register" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full">Sign Up</Button>
+                    </Link>
+                  </div>
+                )}
+              </nav>
+            </div>
           </div>
         )}
       </div>
